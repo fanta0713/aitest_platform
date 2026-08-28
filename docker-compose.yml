@@ -1,0 +1,55 @@
+services:
+  # 测试任务管理后台
+  testtask-backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: testtask-backend
+    ports:
+      - "8888:8888"
+    environment:
+      # JWT 密钥（生产请改成强随机串）
+      - SECRET_KEY=${SECRET_KEY:-please-change-me-in-production}
+      # 数据库配置
+      - DB_HOST=testtask-db
+      - DB_PORT=5432
+      - DB_NAME=${DB_NAME:-testtask}
+      - DB_USER=${DB_USER:-testtask}
+      - DB_PASSWORD=${DB_PASSWORD:-testtask123}
+    volumes:
+      - ./frontend:/app/frontend
+      - ./backend/uploads:/app/uploads
+    depends_on:
+      testtask-db:
+        condition: service_healthy
+    networks:
+      - testtask-network
+    restart: unless-stopped
+
+  # PostgreSQL 数据库
+  testtask-db:
+    image: postgres:15-alpine
+    container_name: testtask-db
+    environment:
+      - POSTGRES_DB=${DB_NAME:-testtask}
+      - POSTGRES_USER=${DB_USER:-testtask}
+      - POSTGRES_PASSWORD=${DB_PASSWORD:-testtask123}
+    volumes:
+      - testtask-db-data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-testtask} -d ${DB_NAME:-testtask}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - testtask-network
+    restart: unless-stopped
+
+networks:
+  testtask-network:
+    driver: bridge
+
+volumes:
+  testtask-db-data:

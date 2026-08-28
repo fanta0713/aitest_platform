@@ -1,0 +1,110 @@
+# === Python ===
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg
+*.egg-info/
+.eggs/
+.pytest_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# === 虚拟环境 ===
+venv/
+.venv/
+env/
+ENV/
+
+# === 环境变量（绝不提交真实密钥）===
+.env
+.env.local
+.env.*.local
+*.env
+
+# === Docker ===
+docker-compose.override.yml
+
+# === IDE / 编辑器 ===
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# === 本地工具记忆 / 工作目录（不应入库）===
+.h3caiwork/
+
+# === 上传文件 ===
+backend/uploads/
+uploads/
+
+# === 数据库数据卷 ===
+testtask-db-data/
+
+# === 临时验证脚本（含硬编码密码，不应入库）===
+verify_*.py
+diag_*.py
+check_db.py
+compare_tree.py
+del_empty_module.py
+deploy*.py
+migrate_*.py
+migrate_*.sh
+run_migrate.py
+run_query.py
+ssh_exec.py
+unlock_admin.py
+fix_html_entities.py
+query_zentao.sh
+
+# === 临时截图 / 图片 ===
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.bmp
+!docs/images/*.png
+!docs/images/*.jpg
+
+# === 临时 HTML / JSON / 文本输出 ===
+*.html.tmp
+body.txt
+cj*.txt
+hdr*.txt
+l3.txt
+login*.txt
+*.json.tmp
+resp.json
+exec.json
+logs.json
+fix.json
+s8000_*.json
+nul
+
+# === 调试 / 历史文档（不入库）===
+overview*.md
+disk_diagnosis.md
+doc_*.md
+model_*.md
+zentao_*.md
+case_quality.sql
+
+# === 禅道历史代码 / 旧版本（已弃用）===
+zentao.js
+zin.js
+test_task_manager_demo/
+test_task_manager_docker/
+test_task_docker.tar
+s8000_backup/
+s8000_steps_*.md
+
+# === 错误的 Windows 路径转义目录（历史遗留）===
+C:Usersz34360H3CAIWORKtest_task*
+
+# === 容器构建产物 ===
+*.tar
