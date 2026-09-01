@@ -59,10 +59,13 @@ async def list_linked_cases(
             "priority": link.case_priority,
             "precondition": case_obj.precondition if case_obj else None,
             "steps": steps_json,
+            "created_by": case_obj.created_by if case_obj else None,
             "latest_result": ({
                 "status": latest.status,
                 "comment": latest.comment,
                 "step_results": latest.step_results,
+                "executor_id": latest.executor_id,
+                "executed_at": (latest.executed_at.isoformat() if latest.executed_at else None),
             } if latest else None),
             "result_count": len(link.results),
         })

@@ -21,7 +21,7 @@ UPLOAD_DIR = "/app/uploads"
 # 允许的文件扩展名（白名单）
 ALLOWED_EXT = {
     "pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx",
-    "txt", "csv", "md", "json", "xml",
+    "txt", "csv", "md", "json", "xml", "log",
     "png", "jpg", "jpeg", "gif", "bmp", "webp",
     "zip", "tar", "gz", "7z", "rar",
 }
@@ -37,7 +37,7 @@ def _check_step_permission(step: TaskStep, user: User, task: TestTask = None) ->
     """校验：步骤 assignee 或 全员环节(assigned_to is None) 或 task 的 executors 才能上传/删除。
     admin 不再自动获得业务环节操作权；如需介入业务环节，需先把自己指派为该环节负责人。"""
     is_assignee = step.assigned_to == user.id
-    is_all_hands = step.assigned_to is None or step.step == 8
+    is_all_hands = step.assigned_to is None
     # 执行测试环节(step==7) 允许任务的所有 executors 上传
     is_task_executor = False
     if task and step.step == 7:

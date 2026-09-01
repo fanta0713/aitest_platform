@@ -35,9 +35,9 @@ async def list_tasks(
     if mine:
         owner = current_user.id
     tasks, total = await service.get_tasks(status=status, owner=owner, limit=limit, offset=offset)
-    # pending过滤：只返回当前环节分配给自己的任务
+    # pending过滤：只返回当前环节分配给自己的任务，已完成的任务不再挂人名下
     if pending:
-        tasks = [t for t in tasks if t.current_step_assignee == current_user.id]
+        tasks = [t for t in tasks if t.status != 'done' and t.current_step_assignee == current_user.id]
         total = len(tasks)
     # 加载每个任务的 current_step_name（从 task_steps 查），避免流程改造后步骤名错位
     task_ids = [t.id for t in tasks]
@@ -47,18 +47,43 @@ async def list_tasks(
             TaskStep.task_id.in_(task_ids)
         )
         # 需要按 step==current_step 配对，先拉所有相关 step
-        all_steps_stmt = select(TaskStep.task_id, TaskStep.step, TaskStep.step_name).where(
+        all_steps_stmt = select(TaskStep.task_id, TaskStep.step, TaskStep.step_name, TaskStep.assigned_to).where(
             TaskStep.task_id.in_(task_ids)
         )
         all_steps = (await db.execute(all_steps_stmt)).all()
-        for tid, step_no, step_name in all_steps:
+        # 收集所有 assignee id 用于批量查人名
+        assignee_ids = set()
+        for tid, step_no, step_name, assigned_to in all_steps:
             task_obj = next((t for t in tasks if t.id == tid), None)
             if task_obj and step_no == task_obj.current_step:
                 step_name_map[tid] = step_name
+                if assigned_to:
+                    assignee_ids.add(assigned_to)
+        # 批量查人名
+        assignee_name_map = {}
+        if assignee_ids:
+            from app.models.models import User
+            users_result = await db.execute(select(User.id, User.realname).where(User.id.in_(assignee_ids)))
+            for uid, realname in users_result.all():
+                assignee_name_map[uid] = realname
+        # 填充 current_step_assignee 和 assignee_name
+        step_assignee_map = {}
+        for tid, step_no, step_name, assigned_to in all_steps:
+            task_obj = next((t for t in tasks if t.id == tid), None)
+            if task_obj and step_no == task_obj.current_step:
+                step_assignee_map[tid] = assigned_to
     items = []
     for t in tasks:
         item = TaskResponse.model_validate(t)
         item.current_step_name = step_name_map.get(t.id)
+        # 已完成的任务不再挂在某个人名下
+        if t.status == 'done':
+            item.current_step_assignee = None
+            item.current_step_assignee_name = None
+        else:
+            item.current_step_assignee = step_assignee_map.get(t.id)
+            if item.current_step_assignee:
+                item.current_step_assignee_name = assignee_name_map.get(item.current_step_assignee)
         items.append(item)
     return TaskListResponse(total=total, items=items)
 
@@ -116,11 +141,19 @@ async def get_task(
     if not task:
         raise HTTPException(status_code=404, detail="任务不存在")
     resp = TaskResponse.model_validate(task)
-    # 填充 current_step_name（从已加载的 task.steps 找）
+    # 填充 current_step_name 和 current_step_assignee_name（从已加载的 task.steps 找）
     if task.steps:
         for s in task.steps:
             if s.step == task.current_step:
                 resp.current_step_name = s.step_name
+                # 已完成的任务不再挂在某个人名下
+                if task.status != 'done':
+                    resp.current_step_assignee = s.assigned_to
+                    if s.assigned_to:
+                        from app.models.models import User
+                        u = (await db.execute(select(User).where(User.id == s.assigned_to))).scalar_one_or_none()
+                        if u:
+                            resp.current_step_assignee_name = u.realname
                 break
     return resp
 
@@ -132,11 +165,17 @@ async def update_task(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    """更新任务"""
+    """更新任务（仅管理员、PL或版本负责人可操作）"""
     service = TaskService(db)
-    task = await service.update_task(task_id, data)
+    task = await service.get_task(task_id)
     if not task:
         raise HTTPException(status_code=404, detail="任务不存在")
+    user_roles = set(_user_roles(current_user))
+    is_admin = 'admin' in user_roles
+    is_pl_or_version_owner = current_user.id in {task.owner, task.version_owner}
+    if not (is_admin or is_pl_or_version_owner):
+        raise HTTPException(status_code=403, detail="仅管理员、PL或版本负责人可更新此任务")
+    task = await service.update_task(task_id, data)
     return TaskResponse.model_validate(task)
 
 

@@ -195,6 +195,20 @@ tbody tr.clickable { cursor: pointer; }
 
 /* 徽章 */
 .badge { display: inline-flex; align-items: center; padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 500; white-space: nowrap; }
+
+/* 任务导航卡片网格 */
+.task-nav-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+.task-nav-card { background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 20px; cursor: pointer; transition: all .2s; position: relative; overflow: hidden; }
+.task-nav-card::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: var(--primary); }
+.task-nav-card:hover { border-color: var(--primary); box-shadow: 0 4px 12px rgba(59,130,246,.12); transform: translateY(-2px); }
+.task-nav-card h4 { font-size: 15px; font-weight: 600; margin: 0 0 8px 0; color: var(--text); }
+.task-nav-card .nav-meta { font-size: 12px; color: var(--text-sub); margin-bottom: 12px; }
+.task-nav-card .nav-stats { display: flex; gap: 12px; font-size: 12px; }
+.task-nav-card .nav-stat { display: flex; flex-direction: column; gap: 2px; }
+.task-nav-card .nav-stat b { font-size: 20px; font-weight: 700; color: var(--primary); }
+.task-nav-card .nav-stat span { color: var(--text-sub); }
+.task-nav-card .nav-arrow { position: absolute; right: 16px; top: 50%; transform: translateY(-50%); font-size: 18px; color: var(--text-sub); transition: all .2s; }
+.task-nav-card:hover .nav-arrow { color: var(--primary); transform: translateY(-50%) translateX(4px); }
 .badge-gray { background: #f1f5f9; color: #475569; }
 .badge-blue { background: var(--primary-light); color: var(--primary); }
 .badge-green { background: var(--success-bg); color: var(--success); }
@@ -424,44 +438,51 @@ tbody tr.clickable { cursor: pointer; }
     <section class="view" id="view-tasks">
       <div class="page-header">
         <div><h2>测试任务</h2><div class="desc">测试任务全生命周期管理 · 11步流程</div></div>
-        <div style="display:flex;gap:10px">
-          <select id="statusFilter" onchange="loadTasks()" style="padding:8px 12px;border:1px solid var(--border);border-radius:8px;background:#fff">
-            <option value="">全部状态</option>
-            <option value="init">任务发起</option>
-            <option value="design">测试设计</option>
-            <option value="version_confirm">版本配套</option>
-            <option value="env_confirm">环境确认</option>
-            <option value="env_approved">环境审核通过</option>
-            <option value="testing">执行测试</option>
-            <option value="review">数据审核</option>
-            <option value="done">测试完成</option>
-            <option value="closed">已关闭</option>
-          </select>
+        <div style="display:flex;gap:10px;align-items:center">
+          <input id="taskSearchInput" placeholder="🔍 搜索任务名称..." oninput="onTaskSearch()" style="padding:8px 12px 8px 32px;border:1px solid var(--border);border-radius:8px;width:220px;background:#fff url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2214%22 height=%2214%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%2394a3b8%22 stroke-width=%222%22><circle cx=%2211%22 cy=%2211%22 r=%228%22/><path d=%22m21 21-4.35-4.35%22/></svg>') no-repeat 10px center; display:none">
           <button class="btn btn-primary" id="taskCreateBtn" onclick="openCreateModal()" style="display:none">+ 发起测试任务</button>
         </div>
       </div>
-      <div class="card">
-        <table>
-          <thead><tr><th>编号</th><th>任务名称</th><th>版本</th><th>状态</th><th>进度</th><th>当前步骤</th><th>负责人</th><th>创建时间</th><th style="text-align:center">操作</th></tr></thead>
-          <tbody id="tasksBody"></tbody>
-        </table>
-        <div class="empty" id="tasksEmpty" style="display:none">暂无任务，点击右上角发起第一个测试任务</div>
+      <!-- 面包屑导航 -->
+      <div id="taskBreadcrumb" style="display:flex;align-items:center;gap:6px;margin-bottom:16px;font-size:13px;color:var(--text-sub)"></div>
+      <!-- 第一层：产品概览 -->
+      <div id="taskNavProducts" class="task-nav-grid"></div>
+      <!-- 第二层：项目概览 -->
+      <div id="taskNavProjects" style="display:none"></div>
+      <!-- 第三层：测试任务列表 -->
+      <div id="taskNavTasks" style="display:none">
+        <div class="card">
+          <table>
+            <thead><tr><th>编号</th><th>任务名称</th><th>版本</th><th>起止时间</th><th>状态</th><th>进度</th><th>当前步骤</th><th>负责人</th><th>创建时间</th><th style="text-align:center">操作</th></tr></thead>
+            <tbody id="tasksBody"></tbody>
+          </table>
+          <div class="empty" id="tasksEmpty" style="display:none">该项目下暂无任务</div>
+        </div>
+      </div>
+      <!-- 全局搜索结果（跨产品/项目） -->
+      <div id="taskSearchResults" style="display:none">
+        <div class="card">
+          <table>
+            <thead><tr><th>编号</th><th>任务名称</th><th>所属产品</th><th>所属项目</th><th>起止时间</th><th>状态</th><th>进度</th><th>当前步骤</th><th>负责人</th><th>创建时间</th></tr></thead>
+            <tbody id="searchBody"></tbody>
+          </table>
+          <div class="empty" id="searchEmpty" style="display:none">未找到匹配的任务</div>
+        </div>
       </div>
     </section>
 
     <!-- 我的任务 -->
     <section class="view" id="view-mytasks">
       <div class="page-header">
-        <div><h2>我的任务</h2><div class="desc" id="myTasksDesc">当前用户名下的所有测试任务</div></div>
+        <div><h2>我的任务</h2><div class="desc" id="myTasksDesc">当前用户名下的测试任务</div></div>
         <div style="display:flex;gap:8px">
-          <button class="btn btn-sm mytab active" id="mtab-all" onclick="loadMyTasks('all')">全部</button>
-          <button class="btn btn-sm mytab" id="mtab-pending" onclick="loadMyTasks('pending')">待我处理</button>
+          <button class="btn btn-sm mytab active" id="mtab-pending" onclick="loadMyTasks('pending')">待我处理</button>
           <button class="btn btn-sm mytab" id="mtab-done" onclick="loadMyTasks('done')">我已处理</button>
         </div>
       </div>
       <div class="card">
         <table>
-          <thead><tr><th>编号</th><th>任务名称</th><th>版本</th><th>状态</th><th>进度</th><th>当前环节</th><th>我的角色</th><th>当前处理人</th></tr></thead>
+          <thead><tr><th>编号</th><th>任务名称</th><th>版本</th><th>起止时间</th><th>状态</th><th>进度</th><th>当前环节</th><th>我的角色</th><th>当前处理人</th></tr></thead>
           <tbody id="myTasksBody"></tbody>
         </table>
         <div class="empty" id="myTasksEmpty" style="display:none">暂无任务</div>
@@ -536,6 +557,7 @@ tbody tr.clickable { cursor: pointer; }
             <thead><tr><th>名称</th><th>代号</th><th>起止日期</th><th style="width:120px">操作</th></tr></thead>
             <tbody id="ppProjectBody"><tr><td colspan="4" class="muted" style="padding:12px">请先在左侧选择一个产品</td></tr></tbody>
           </table>
+          <div id="ppOrphanBox" style="margin-top:16px;display:none"></div>
         </div>
       </div>
     </section>
@@ -622,7 +644,7 @@ tbody tr.clickable { cursor: pointer; }
         <div class="field"><label>版本负责人</label><select id="cVersionOwner"></select></div>
       </div>
       <div class="form-row">
-        <div class="field"><label>测试执行人</label><select id="cExecutor"></select></div>
+        <div class="field"><label>测试执行人</label><select id="cExecutor" onchange="refreshExecutorOptions()"></select></div>
         <div class="field"><label>&nbsp;</label><button type="button" class="btn btn-sm" style="margin-top:4px" onclick="addExecutorRow()">+ 增加测试执行人</button></div>
       </div>
       <div id="executorsList" style="margin:-4px 0 8px"></div>
@@ -721,15 +743,6 @@ tbody tr.clickable { cursor: pointer; }
         <select id="jcProduct"></select>
       </div>
       <div class="field"><label>项目名称 *</label><input id="jcName" placeholder="如：IRACK v3r3b01 测试项目"></div>
-      <div class="form-row">
-        <div class="field"><label>项目代号</label><input id="jcCode" placeholder="可留空"></div>
-        <div class="field"><label>项目模型</label>
-          <select id="jcModel">
-            <option value="waterfall">瀑布模型</option>
-            <option value="waterfallplus">融合瀑布</option>
-          </select>
-        </div>
-      </div>
       <div class="form-row">
         <div class="field"><label>开始日期 *</label><input id="jcBegin" type="date"></div>
         <div class="field"><label>结束日期 *</label><input id="jcEnd" type="date"></div>
@@ -924,6 +937,28 @@ tbody tr.clickable { cursor: pointer; }
 
 <!-- 禅道测试单弹窗、禅道迁移弹窗均已移除 -->
 
+<!-- 用例执行弹窗（步骤7 执行测试时点击用例超链接弹出） -->
+<div class="modal-mask" id="caseExecModal">
+  <div class="modal" style="width:780px;max-height:90vh;display:flex;flex-direction:column">
+    <div class="modal-head"><h3 id="caseExecTitle">用例执行</h3><button class="modal-close" onclick="closeModal('caseExecModal')">×</button></div>
+    <div class="modal-body" id="caseExecBody" style="flex:1;overflow-y:auto"></div>
+    <div class="modal-foot" id="caseExecFoot">
+      <button class="btn btn-primary" onclick="confirmCaseExec()">确认</button>
+    </div>
+  </div>
+</div>
+
+<!-- 执行人与用例指派管理弹窗（步骤7，仅PL/版本负责人） -->
+<div class="modal-mask" id="execManageModal">
+  <div class="modal" style="width:720px;max-height:90vh;display:flex;flex-direction:column">
+    <div class="modal-head"><h3>执行人与用例指派</h3><button class="modal-close" onclick="closeModal('execManageModal')">×</button></div>
+    <div class="modal-body" id="execManageBody" style="flex:1;overflow-y:auto"></div>
+    <div class="modal-foot">
+      <button class="btn" onclick="closeModal('execManageModal')">取消</button>
+      <button class="btn btn-primary" onclick="saveExecManage()">保存</button>
+    </div>
+  </div>
+</div>
 <script>
 // ============ 基础工具 ============
 const API = '';
@@ -1052,13 +1087,13 @@ function switchView(name) {
   if (el) el.classList.add('active');
   if (name === 'dashboard') { loadStats(); loadTasks(); }
   if (name === 'tasks') loadTasks();
-  if (name === 'mytasks') loadMyTasks();
+  if (name === 'mytasks') loadMyTasks('pending');
   if (name === 'people') renderUserRoles();
   if (name === 'pp') loadPPPage();
   if (name === 'caselib') loadCaseLibs();
 }
 
-async function loadMyTasks(mode = 'all') {
+async function loadMyTasks(mode = 'pending') {
   // 切换tab样式
   document.querySelectorAll('.mytab').forEach(b => b.classList.remove('active', 'btn-primary'));
   const tabBtn = document.getElementById('mtab-' + mode);
@@ -1070,14 +1105,10 @@ async function loadMyTasks(mode = 'all') {
       // 待我处理：当前环节分配给我
       const data = await api('/api/tasks?mine=true&pending=true');
       tasks = data.items;
-    } else if (mode === 'done') {
+    } else {
       // 我已处理：我参与但当前环节不归我
       const allData = await api('/api/tasks?mine=true');
       tasks = allData.items.filter(t => t.current_step_assignee !== currentUser.id);
-    } else {
-      // 全部
-      const data = await api('/api/tasks?mine=true');
-      tasks = data.items;
     }
     document.getElementById('myTasksEmpty').style.display = tasks.length ? 'none' : 'block';
     document.getElementById('myTasksBody').innerHTML = tasks.map(t => {
@@ -1086,12 +1117,18 @@ async function loadMyTasks(mode = 'all') {
       if (t.tse_id === currentUser.id) myRoles.push('TSE');
       if (t.version_owner === currentUser.id) myRoles.push('版本负责人');
       if (t.executor_id === currentUser.id) myRoles.push('测试执行');
-      const isMyTurn = t.current_step_assignee === currentUser.id;
-      const handlerName = t.current_step_assignee ? userName(t.current_step_assignee) : '全员';
+      const isDone = t.status === 'done' || t.current_step === 10;
+      const isMyTurn = !isDone && t.current_step_assignee === currentUser.id;
+      const handlerName = isDone
+        ? '已完成'
+        : (t.current_step_assignee
+            ? userName(t.current_step_assignee)
+            : (t.current_step === 9 ? `PL:${userName(t.owner)} + TSE:${userName(t.tse_id)}` : '全员'));
       return `<tr class="clickable" onclick="openTask(${t.id})">
         <td style="font-family:monospace;color:var(--primary);font-weight:600">${esc(t.code)}</td>
         <td style="font-weight:500">${esc(t.name)}</td>
         <td>${esc(t.version || '—')}</td>
+        <td class="muted" style="font-size:12px">${formatTaskDateRange(t)}</td>
         <td>${statusBadge(t.status)}</td>
         <td>${t.progress}%</td>
         <td><span class="badge ${isMyTurn ? 'badge-blue' : 'badge-gray'}">${t.current_step}. ${t.current_step_name || STEP_NAMES[t.current_step-1] || '—'}</span></td>
@@ -1173,17 +1210,21 @@ async function loadZentaoProjects() {
   fillProjectSelect(prodId);
 }
 
-// 按选中产品过滤项目下拉；prodId 为空时显示全部（孤儿项目也允许选）
+// 按选中产品过滤项目下拉；prodId 为空时显示全部
 function fillProjectSelect(productId) {
   const sel = document.getElementById('cProject');
   if (!sel) return;
   const val = sel.value;
   let projects = zentaoProjectsCache;
   if (productId) {
-    projects = projects.filter(p => p.product_id === parseInt(productId) || p.id == parseInt(productId));
+    projects = projects.filter(p => p.product_id === parseInt(productId));
   }
-  sel.innerHTML = '<option value="">— 未关联 —</option>' +
-    projects.map(p => `<option value="${p.id}">${esc(p.name)}</option>`).join('');
+  sel.innerHTML = '<option value="">— 选择项目 —</option>' +
+    projects.map(p => {
+      const hasDate = p.begin_date && p.end_date;
+      const label = hasDate ? p.name : `${p.name}（未设置日期）`;
+      return `<option value="${p.id}" ${!hasDate ? 'disabled' : ''} title="${hasDate ? '' : '该项目未设置起止日期，请先在产品&项目页编辑'}">${esc(label)}</option>`;
+    }).join('');
   if (val) sel.value = val;
 }
 
@@ -1246,7 +1287,7 @@ async function createProduct() {
 }
 
 function openProjectCreateModal() {
-  ['jcName','jcCode','jcDesc'].forEach(id => document.getElementById(id).value = '');
+  ['jcName','jcDesc'].forEach(id => document.getElementById(id).value = '');
   // 预选当前选中的产品
   const cPid = document.getElementById('cProduct').value;
   fillProductSelect('jcProduct');
@@ -1254,7 +1295,6 @@ function openProjectCreateModal() {
   const today = new Date().toISOString().slice(0, 10);
   document.getElementById('jcBegin').value = today;
   document.getElementById('jcEnd').value = '';
-  document.getElementById('jcModel').value = 'waterfall';
   document.getElementById('projectCreateModal').classList.add('show');
 }
 
@@ -1270,10 +1310,11 @@ async function createProject() {
   btn.disabled = true; btn.textContent = '创建中…';
   try {
     const result = await api('/api/projects', { method: 'POST', body: {
-      name, code: document.getElementById('jcCode').value.trim(),
-      model: document.getElementById('jcModel').value,
-      product_id: parseInt(productId), begin, end,
-      desc: document.getElementById('jcDesc').value.trim(),
+      name,
+      product_id: parseInt(productId),
+      begin_date: begin,
+      end_date: end,
+      description: document.getElementById('jcDesc').value.trim(),
     }});
     toast(`项目「${result.name}」已创建（ID: ${result.id}）`);
     closeModal('projectCreateModal');
@@ -1309,14 +1350,15 @@ async function loadStats() {
 
 let allTasksCache = [];
 async function loadTasks() {
-  const status = document.getElementById('statusFilter').value;
+  // 先确保产品/项目缓存已加载（三级导航需要）
+  if (!zentaoProductsCache.length) { try { zentaoProductsCache = await api('/api/products'); } catch(e) {} }
+  if (!zentaoProjectsCache.length) { try { zentaoProjectsCache = await api('/api/projects'); } catch(e) {} }
   try {
-    const q = status ? `?status=${status}` : '';
-    const data = await api('/api/tasks' + q);
+    const data = await api('/api/tasks');
     allTasksCache = data.items;
   } catch (e) { return; }
-  renderTasks(allTasksCache);
   renderRecent(allTasksCache.slice(0, 6));
+  renderTaskNav();
 }
 
 const STATUS_MAP = {
@@ -1338,14 +1380,51 @@ function userName(id) {
   return u ? (u.realname || u.account) : '#' + id;
 }
 
-function renderTasks(tasks) {
-  const body = document.getElementById('tasksBody');
-  document.getElementById('tasksEmpty').style.display = tasks.length ? 'none' : 'block';
-  body.innerHTML = tasks.map(t => `
+// ============ 测试任务三级导航：产品 → 项目 → 任务 ============
+let taskNavLevel = 'products';  // 'products' | 'projects' | 'tasks'
+let taskNavProductId = null;
+let taskNavProjectId = null;
+
+function onTaskSearch() {
+  const kw = (document.getElementById('taskSearchInput').value || '').trim();
+  if (!kw) {
+    // 恢复导航视图
+    document.getElementById('taskSearchResults').style.display = 'none';
+    document.getElementById('taskBreadcrumb').style.display = 'flex';
+    if (taskNavLevel === 'products') {
+      document.getElementById('taskNavProducts').style.display = 'grid';
+      document.getElementById('taskNavProjects').style.display = 'none';
+      document.getElementById('taskNavTasks').style.display = 'none';
+    } else if (taskNavLevel === 'projects') {
+      document.getElementById('taskNavProducts').style.display = 'none';
+      document.getElementById('taskNavProjects').style.display = 'block';
+      document.getElementById('taskNavTasks').style.display = 'none';
+    } else {
+      document.getElementById('taskNavProducts').style.display = 'none';
+      document.getElementById('taskNavProjects').style.display = 'none';
+      document.getElementById('taskNavTasks').style.display = 'block';
+    }
+    return;
+  }
+  // 全局搜索：跨产品/项目搜任务（严格匹配，区分大小写）
+  const results = allTasksCache.filter(t =>
+    (t.name || '').includes(kw) || (t.code || '').includes(kw)
+  );
+  // 隐藏导航视图，显示搜索结果
+  document.getElementById('taskNavProducts').style.display = 'none';
+  document.getElementById('taskNavProjects').style.display = 'none';
+  document.getElementById('taskNavTasks').style.display = 'none';
+  document.getElementById('taskBreadcrumb').style.display = 'none';
+  document.getElementById('taskSearchResults').style.display = 'block';
+  const body = document.getElementById('searchBody');
+  document.getElementById('searchEmpty').style.display = results.length ? 'none' : 'block';
+  body.innerHTML = results.map(t => `
     <tr class="clickable" onclick="openTask(${t.id})">
-      <td style="font-family:monospace;color:var(--primary);font-weight:600">${esc(t.code)}</td>
+      <td style="font-family:monospace;color:var(--primary);font-weight:600;font-size:12px">${esc(t.code)}</td>
       <td style="font-weight:500">${esc(t.name)}</td>
-      <td>${esc(t.version || '—')}</td>
+      <td class="muted" style="font-size:12px">${esc(t.product_name || '—')}</td>
+      <td class="muted" style="font-size:12px">${esc(zentaoProjectsCache.find(p => p.id === t.project_id)?.name || '—')}</td>
+      <td class="muted" style="font-size:12px">${formatTaskDateRange(t)}</td>
       <td>${statusBadge(t.status)}</td>
       <td style="min-width:100px">
         <div style="display:flex;align-items:center;gap:8px">
@@ -1355,11 +1434,152 @@ function renderTasks(tasks) {
           <span style="font-size:12px;color:var(--text-sub)">${t.progress}%</span>
         </div>
       </td>
-      <td><span class="badge badge-gray">${t.current_step}. ${t.current_step_name || STEP_NAMES[t.current_step-1] || '—'}</span></td>
-      <td>${esc(userName(t.owner))}</td>
-      <td class="muted">${(t.created_at || '').slice(0, 10)}</td>
+      <td><span class="badge badge-gray" style="font-size:11px">${t.current_step}. ${t.current_step_name || STEP_NAMES[t.current_step-1] || '—'}</span></td>
+      <td style="font-size:12px">${esc(t.current_step === 9 ? `PL:${userName(t.owner)} + TSE:${userName(t.tse_id)}` : (t.current_step_assignee_name || userName(t.owner)))}</td>
+      <td class="muted" style="font-size:12px">${(t.created_at || '').slice(0, 10)}</td>
+    </tr>`).join('');
+}
+
+// 格式化任务起止时间显示
+function formatTaskDateRange(t) {
+  const b = t.begin_date ? t.begin_date.slice(0, 10) : '—';
+  const e = t.end_date ? t.end_date.slice(0, 10) : '—';
+  return `${b} ~ ${e}`;
+}
+
+function renderTaskNav() {
+  const kw = (document.getElementById('taskSearchInput')?.value || '').trim();
+  if (kw) { onTaskSearch(); return; } // 搜索模式
+  const bc = document.getElementById('taskBreadcrumb');
+  const productsDiv = document.getElementById('taskNavProducts');
+  const projectsDiv = document.getElementById('taskNavProjects');
+  const tasksDiv = document.getElementById('taskNavTasks');
+  const searchInput = document.getElementById('taskSearchInput');
+
+  if (taskNavLevel === 'products') {
+    bc.style.display = 'none';
+    searchInput.style.display = 'none';
+    productsDiv.style.display = 'grid';
+    projectsDiv.style.display = 'none';
+    tasksDiv.style.display = 'none';
+    renderTaskNavProducts();
+  } else if (taskNavLevel === 'projects') {
+    const prod = zentaoProductsCache.find(p => p.id === taskNavProductId);
+    bc.style.display = 'flex';
+    bc.innerHTML = `<span style="cursor:pointer;color:var(--primary)" onclick="backToTaskProducts()">产品列表</span><span>›</span><b>${esc(prod?.name || '—')}</b>`;
+    searchInput.style.display = 'none';
+    productsDiv.style.display = 'none';
+    projectsDiv.style.display = 'block';
+    tasksDiv.style.display = 'none';
+    renderTaskNavProjects();
+  } else {
+    const prod = zentaoProductsCache.find(p => p.id === taskNavProductId);
+    const proj = zentaoProjectsCache.find(p => p.id === taskNavProjectId);
+    bc.style.display = 'flex';
+    bc.innerHTML = `<span style="cursor:pointer;color:var(--primary)" onclick="backToTaskProducts()">产品列表</span><span>›</span><span style="cursor:pointer;color:var(--primary)" onclick="backToTaskProjects()">${esc(prod?.name || '—')}</span><span>›</span><b>${esc(proj?.name || '—')}</b>`;
+    searchInput.style.display = 'block';
+    productsDiv.style.display = 'none';
+    projectsDiv.style.display = 'none';
+    tasksDiv.style.display = 'block';
+    renderTaskNavTasks();
+  }
+}
+
+function renderTaskNavProducts() {
+  const grid = document.getElementById('taskNavProducts');
+  const prods = zentaoProductsCache || [];
+  if (!prods.length) {
+    grid.innerHTML = '<div class="empty">暂无产品，请先在「产品与项目」页创建产品</div>';
+    return;
+  }
+  grid.innerHTML = prods.map(p => {
+    const projCount = (zentaoProjectsCache || []).filter(pr => pr.product_id === p.id).length;
+    const taskCount = allTasksCache.filter(t => {
+      const proj = zentaoProjectsCache.find(pr => pr.id === t.project_id);
+      return proj?.product_id === p.id;
+    }).length;
+    return `<div class="task-nav-card" onclick="enterTaskProduct(${p.id})">
+      <h4>${esc(p.name)}</h4>
+      <div class="nav-meta">${esc(p.code || '—')} · ${esc(p.description?.slice(0,40) || '')}</div>
+      <div class="nav-stats">
+        <div class="nav-stat"><b>${projCount}</b><span>项目</span></div>
+        <div class="nav-stat"><b>${taskCount}</b><span>任务</span></div>
+      </div>
+      <div class="nav-arrow">›</div>
+    </div>`;
+  }).join('');
+}
+
+function enterTaskProduct(pid) {
+  taskNavProductId = pid;
+  taskNavLevel = 'projects';
+  renderTaskNav();
+}
+
+function renderTaskNavProjects() {
+  const div = document.getElementById('taskNavProjects');
+  const projs = (zentaoProjectsCache || []).filter(p => p.product_id === taskNavProductId);
+  if (!projs.length) {
+    div.innerHTML = '<div class="empty">该产品下暂无项目，点击右上角新建项目</div>';
+    return;
+  }
+  div.innerHTML = `<div class="task-nav-grid">` + projs.map(p => {
+    const taskCount = allTasksCache.filter(t => t.project_id === p.id).length;
+    const dateRange = p.begin_date && p.end_date ? `${p.begin_date} ~ ${p.end_date}` : '<span style="color:var(--danger)">未设置日期</span>';
+    return `<div class="task-nav-card" onclick="enterTaskProject(${p.id})">
+      <h4>${esc(p.name)}</h4>
+      <div class="nav-meta">${dateRange} ${esc(p.code || '')}</div>
+      <div class="nav-stats">
+        <div class="nav-stat"><b>${taskCount}</b><span>任务</span></div>
+      </div>
+      <div class="nav-arrow">›</div>
+    </div>`;
+  }).join('') + `</div>`;
+}
+
+function enterTaskProject(pid) {
+  taskNavProjectId = pid;
+  taskNavLevel = 'tasks';
+  renderTaskNav();
+}
+
+function backToTaskProducts() {
+  taskNavLevel = 'products';
+  taskNavProductId = null;
+  taskNavProjectId = null;
+  renderTaskNav();
+}
+
+function backToTaskProjects() {
+  taskNavLevel = 'projects';
+  taskNavProjectId = null;
+  renderTaskNav();
+}
+
+function renderTaskNavTasks() {
+  const tasks = allTasksCache.filter(t => t.project_id === taskNavProjectId);
+  const body = document.getElementById('tasksBody');
+  document.getElementById('tasksEmpty').style.display = tasks.length ? 'none' : 'block';
+  body.innerHTML = tasks.map(t => `
+    <tr class="clickable" onclick="openTask(${t.id})">
+      <td style="font-family:monospace;color:var(--primary);font-weight:600;font-size:12px">${esc(t.code)}</td>
+      <td style="font-weight:500">${esc(t.name)}</td>
+      <td><span class="muted" style="font-size:12px">${esc(t.version || '—')}</span></td>
+      <td class="muted" style="font-size:12px">${formatTaskDateRange(t)}</td>
+      <td>${statusBadge(t.status)}</td>
+      <td style="min-width:100px">
+        <div style="display:flex;align-items:center;gap:8px">
+          <div style="flex:1;height:6px;background:#e2e8f0;border-radius:3px;overflow:hidden">
+            <div style="width:${t.progress}%;height:100%;background:var(--primary)"></div>
+          </div>
+          <span style="font-size:12px;color:var(--text-sub)">${t.progress}%</span>
+        </div>
+      </td>
+      <td><span class="badge badge-gray" style="font-size:11px">${t.current_step}. ${t.current_step_name || STEP_NAMES[t.current_step-1] || '—'}</span></td>
+      <td style="font-size:12px">${esc(t.current_step === 9 ? `PL:${userName(t.owner)} + TSE:${userName(t.tse_id)}` : (t.current_step_assignee_name || userName(t.owner)))}</td>
+      <td class="muted" style="font-size:12px">${(t.created_at || '').slice(0, 10)}</td>
       <td onclick="event.stopPropagation()" style="text-align:center">
-        ${canManageTasks() ? `<button class="btn-danger-text" onclick="deleteTask(${t.id},'${esc(t.code)}')">删除</button>` : '—'}
+        ${canManageTasks() ? `<button class="btn-danger-text" style="font-size:12px" onclick="deleteTask(${t.id},'${esc(t.code)}')">删除</button>` : '—'}
       </td>
     </tr>`).join('');
 }
@@ -1415,9 +1635,9 @@ async function openTask(id) {
 // 各环节准出条件配置（10步，去掉原"人力计算"）
 const STEP_FORMS = {
   1: { criteria: '给出测试任务名称、待测产品名称、项目名称', readonly: true },
-  2: { criteria: '关联测试方案链接', fields: [
-    { key: 'test_plan_url', label: '测试方案链接', type: 'url', full: true },
-  ]},
+  2: { criteria: '关联测试方案链接 + 关联测试用例（均必填）', fields: [
+    { key: 'test_plan_url', label: '测试方案链接', type: 'url', full: true, required: true },
+  ], requireCases: true },
   3: { criteria: '被测版本信息 + 依赖版本信息（无的填"无"）', fields: [
     { key: 'target_version', label: '被测版本信息', type: 'text', full: true },
     { key: 'hdm_version', label: 'HDM版本' }, { key: 'bios_version', label: 'BIOS版本' },
@@ -1429,7 +1649,7 @@ const STEP_FORMS = {
     { key: 'switch_cpld_version', label: 'Switch CPLD版本' }, { key: 'retimer_version', label: 'retimer版本' },
     { key: 'stress_tool_version', label: '压测工具版本' },
   ]},
-  4: { criteria: '测试环境CPU、内存、IP + 环境自检报告附件', attachments: 'env_check', fields: [
+  4: { criteria: '测试环境CPU、内存、IP + 环境自检报告附件（附件必传）', attachments: 'env_check', requireAttachment: true, fields: [
     { key: 'cpu', label: 'CPU', full: true },
     { key: 'memory', label: '内存' }, { key: 'ip', label: '测试环境IP' },
   ]},
@@ -1437,17 +1657,14 @@ const STEP_FORMS = {
     { key: 'review_result', label: '审核结果', type: 'select', options: [['pass','通过'],['reject','打回（退回环境确认）']] },
     { key: 'review_comment', label: '审核意见', type: 'textarea', full: true },
   ]},
-  6: { criteria: '版本负责人将关联用例分配给具体测试执行人，每个用例指定一名执行人', case_assign: true },
-  7: { criteria: '按用例执行测试，记录结果。失败/阻塞需填写原因并可上传日志/图片附件（合并原"问题记录"环节）' },
-  8: { criteria: '测试报告、测试过程log链接、自动化工具结果作为附件贴入后才可下行', fields: [
-    { key: 'report_url', label: '测试报告链接', type: 'url', full: true },
-    { key: 'log_url', label: '测试过程log链接', type: 'url', full: true },
-    { key: 'auto_result_url', label: '自动化工具结果链接', type: 'url', full: true },
+  6: { criteria: '版本负责人将关联用例分配给具体测试执行人，每个用例必须指定执行人（全部分配后才能完成本环节）', case_assign: true, requireAllAssigned: true },
+  7: { criteria: '按用例执行测试，记录结果。所有用例必须有测试结果（通过/失败/阻塞/不支持）才能进入下一环节', requireAllTested: true },
+  8: { criteria: '测试报告、测试过程log链接、自动化工具结果（均为必填）', fields: [
+    { key: 'report_url', label: '测试报告链接', type: 'url', full: true, required: true },
+    { key: 'log_url', label: '测试过程log链接', type: 'url', full: true, required: true },
+    { key: 'auto_result_url', label: '自动化工具结果链接', type: 'url', full: true, required: true },
   ]},
-  9: { criteria: '给出数据审核结论才可下行；如需补测，环节5~8退回重做，环节5处理人改为版本负责人', fields: [
-    { key: 'conclusion', label: '审核结论', type: 'select', options: [['pass','通过'],['retest','需补测（退回环节5）']] },
-    { key: 'remark', label: '审核说明', type: 'textarea', full: true },
-  ]},
+  9: { criteria: 'PL 和 TSE 都审核通过后才可下行；如需补测，退回环节8（测试完成）由版本负责人组织补测后重新提交', dualReview: true },
   10: { criteria: '任务归档、总结复盘' },
 };
 
@@ -1469,6 +1686,63 @@ function renderStepForm(s, taskId, isCurrent, canOperate) {
   let html = `<div class="step-criteria">📋 准出条件：${cfg.criteria}</div>`;
   // 非当前环节或已完成的环节 → 字段只读
   const fieldReadOnly = (isDone || !isCurrent || !canOperate) ? 'disabled' : '';
+  // 数据审核双审核模式（PL + TSE 各自审核，都通过后才能下行）
+  if (cfg.dualReview) {
+    const isPL = currentUser && ((currentUser.roles || []).includes('pl') || currentUser.id === currentTask?.owner);
+    const isTSE = currentUser && ((currentUser.roles || []).includes('tse') || currentUser.id === currentTask?.tse_id);
+    const plReview = data.pl_review || {};
+    const tseReview = data.tse_review || {};
+    const plDone = plReview.result;  // pass / retest
+    const tseDone = tseReview.result;
+    html += `<div class="step-form" style="display:grid;gap:12px">`;
+    // PL 审核区
+    html += `<div style="padding:12px;border:1px solid var(--border);border-radius:8px;background:#f8fafc">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <b style="font-size:13px">🔵 PL 审核</b>
+        ${plDone ? `<span class="badge ${plDone === 'pass' ? 'badge-green' : 'badge-red'}">${plDone === 'pass' ? '通过' : '需补测'}</span>` : '<span class="badge badge-gray">待审核</span>'}
+      </div>
+      <div class="full"><label>PL 审核结论</label>
+        <select id="sf_${s.id}_pl_review_result" ${(isDone || !isCurrent || !isPL) ? 'disabled' : ''}>
+          <option value="">— 请选择 —</option>
+          <option value="pass" ${plReview.result === 'pass' ? 'selected' : ''}>通过</option>
+          <option value="retest" ${plReview.result === 'retest' ? 'selected' : ''}>需补测（退回环节8 测试完成）</option>
+        </select>
+      </div>
+      <div class="full"><label>PL 审核说明</label><textarea rows="2" id="sf_${s.id}_pl_review_remark" ${(isDone || !isCurrent || !isPL) ? 'disabled' : ''}>${esc(plReview.remark || '')}</textarea></div>
+    </div>`;
+    // TSE 审核区
+    html += `<div style="padding:12px;border:1px solid var(--border);border-radius:8px;background:#f8fafc">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <b style="font-size:13px">🟣 TSE 审核</b>
+        ${tseDone ? `<span class="badge ${tseDone === 'pass' ? 'badge-green' : 'badge-red'}">${tseDone === 'pass' ? '通过' : '需补测'}</span>` : '<span class="badge badge-gray">待审核</span>'}
+      </div>
+      <div class="full"><label>TSE 审核结论</label>
+        <select id="sf_${s.id}_tse_review_result" ${(isDone || !isCurrent || !isTSE) ? 'disabled' : ''}>
+          <option value="">— 请选择 —</option>
+          <option value="pass" ${tseReview.result === 'pass' ? 'selected' : ''}>通过</option>
+          <option value="retest" ${tseReview.result === 'retest' ? 'selected' : ''}>需补测（退回环节8 测试完成）</option>
+        </select>
+      </div>
+      <div class="full"><label>TSE 审核说明</label><textarea rows="2" id="sf_${s.id}_tse_review_remark" ${(isDone || !isCurrent || !isTSE) ? 'disabled' : ''}>${esc(tseReview.remark || '')}</textarea></div>
+    </div>`;
+    // 状态汇总
+    const bothPass = plDone === 'pass' && tseDone === 'pass';
+    const anyRetest = plDone === 'retest' || tseDone === 'retest';
+    html += `<div style="padding:8px 12px;border-radius:8px;background:${bothPass ? '#dcfce7' : anyRetest ? '#fee2e2' : '#f1f5f9'};font-size:12px">
+      ${bothPass ? '✅ PL 和 TSE 都已审核通过，可以完成本环节' : anyRetest ? '❌ 有审核人选择了"需补测"，将退回环节8（测试完成）由版本负责人组织补测' : '⏳ PL 和 TSE 都需要审核通过后才能完成本环节'}
+    </div>`;
+    html += `</div>`;
+    // 按钮区
+    if (isCurrent && canOperate) {
+      html += `<div style="margin-top:12px;text-align:right">`;
+      if (isPL || isTSE) {
+        html += `<button class="btn btn-sm" style="margin-right:8px" onclick="saveDualReview(${currentTask.id}, ${s.id})">💾 保存审核</button>`;
+      }
+      html += `<button class="btn btn-sm btn-primary" onclick="completeStep(${currentTask.id}, ${s.id})">✓ 完成本环节</button>`;
+      html += `</div>`;
+    }
+    return html;
+  }
   if (cfg.fields) {
     html += `<div class="step-form">`;
     for (const f of cfg.fields) {
@@ -1491,7 +1765,7 @@ function renderStepForm(s, taskId, isCurrent, canOperate) {
     if (isCurrent && canOperate) {
       html += `<div class="step-actions">`;
       html += `<button class="btn btn-sm" onclick="saveStepData(${taskId}, ${s.id})">💾 保存数据</button>`;
-      if (s.step === 5 || s.step === 9) {
+      if (s.step === 5) {
         html += `<button class="btn btn-sm btn-primary" onclick="submitReviewStep(${taskId}, ${s.id}, ${s.step})">提交审核</button>`;
       } else if (s.step <= 8 || s.step === 10) {
         html += `<button class="btn btn-sm btn-primary" onclick="completeStep(${taskId}, ${s.id})">✓ 完成本环节</button>`;
@@ -1522,29 +1796,140 @@ async function saveStepData(taskId, stepId) {
   const step = stepCache.find(s => s.id === stepId);
   if (!step) return;
   const extData = collectStepData(stepId, step.step);
+  const cfg = STEP_FORMS[step.step];
+  // 步骤6 用例分配：同时保存 case_assignments
+  if (cfg && cfg.case_assign) {
+    const assignments = {};
+    document.querySelectorAll(`select[id^="caseAssign_${stepId}_"]`).forEach(sel => {
+      const caseId = sel.id.replace(`caseAssign_${stepId}_`, '');
+      if (sel.value) assignments[caseId] = parseInt(sel.value);
+    });
+    Object.assign(extData, { case_assignments: assignments });
+  }
   try {
     await api(`/api/tasks/${taskId}/steps/${stepId}`, { method: 'PUT', body: { ext_data: extData } });
-    toast('准出条件数据已保存');
+    step.ext_data = extData;
+    toast('数据已保存');
   } catch (e) { toast(e.message, true); }
 }
 
 async function completeStep(taskId, stepId) {
   const step = stepCache.find(s => s.id === stepId);
   if (!step) return;
-  const extData = collectStepData(stepId, step.step);
-  // 校验必填（有字段的环节至少填一个）
+  let extData = collectStepData(stepId, step.step);
   const cfg = STEP_FORMS[step.step];
+  // 1. 校验必填字段（required: true）
   if (cfg && cfg.fields) {
-    const filled = cfg.fields.some(f => (extData[f.key] || '').trim());
-    if (!filled && step.step !== 7 && step.step !== 8 && step.step !== 11) {
-      toast('请先填写准出条件数据再完成本环节', true);
+    for (const f of cfg.fields) {
+      if (f.required) {
+        const val = (extData[f.key] || '').trim();
+        if (!val) {
+          toast(`请填写"${f.label}"再完成本环节`, true);
+          return;
+        }
+      }
+    }
+  }
+  // 2. 校验必填用例关联（requireCases: true，步骤2）
+  if (cfg && cfg.requireCases) {
+    if (!linkedCasesCache.length) {
+      toast('请先关联测试用例再完成本环节', true);
       return;
     }
+  }
+  // 3. 校验必传附件（requireAttachment: true，步骤4）
+  if (cfg && cfg.requireAttachment) {
+    try {
+      const files = await api(`/api/tasks/${taskId}/steps/${stepId}/files`);
+      if (!files || !files.length) {
+        toast('请上传环境自检报告附件再完成本环节', true);
+        return;
+      }
+    } catch (e) { toast('附件校验失败：' + e.message, true); return; }
+  }
+  // 4. 校验用例全部分配（requireAllAssigned: true，步骤6）
+  if (cfg && cfg.requireAllAssigned) {
+    const assignments = step.ext_data?.case_assignments || {};
+    const total = linkedCasesCache.length;
+    const assigned = Object.keys(assignments).length;
+    if (!total) {
+      toast('该任务未关联用例，请先在「测试设计」环节关联用例', true); return;
+    }
+    if (assigned < total) {
+      const unassigned = total - assigned;
+      toast(`还有 ${unassigned} 条用例未分配执行人，请全部分配后再完成本环节`, true); return;
+    }
+  }
+  // 5. 校验用例全部测试完成（requireAllTested: true，步骤7）
+  if (cfg && cfg.requireAllTested) {
+    // 每个用例的每个步骤都必须有测试结果（pass/fail/block/na）
+    const notFullyTested = [];
+    linkedCasesCache.forEach(c => {
+      const steps = Array.isArray(c.steps) ? c.steps : [];
+      if (!steps.length) return; // 没步骤的用例跳过
+      const stepResMap = {};
+      if (c.latest_result && Array.isArray(c.latest_result.step_results)) {
+        c.latest_result.step_results.forEach(s => { stepResMap[s.step_idx] = s; });
+      }
+      const untestedSteps = steps.filter((_, si) => !stepResMap[si]);
+      if (untestedSteps.length || !c.latest_result) {
+        notFullyTested.push({ title: c.title, untested: untestedSteps.length, total: steps.length });
+      }
+    });
+    if (notFullyTested.length) {
+      const first = notFullyTested[0];
+      toast(`还有 ${notFullyTested.length} 条用例未完全测试（如「${first.title}」还有 ${first.untested}/${first.total} 步未测），请全部测试完成后再进入下一环节`, true); return;
+    }
+  }
+  // 6. 数据审核双审核校验（dualReview: true，步骤9）
+  if (cfg && cfg.dualReview) {
+    // 只读取表单当前值，绝不 fallback 到旧 ext_data（避免用户改了下拉框没保存导致用旧值）
+    const plR = document.getElementById(`sf_${stepId}_pl_review_result`)?.value || '';
+    const plRemark = document.getElementById(`sf_${stepId}_pl_review_remark`)?.value || '';
+    const tseR = document.getElementById(`sf_${stepId}_tse_review_result`)?.value || '';
+    const tseRemark = document.getElementById(`sf_${stepId}_tse_review_remark`)?.value || '';
+    if (!plR) { toast('PL 审核结论未选择，请先填写 PL 审核结论', true); return; }
+    if (!tseR) { toast('TSE 审核结论未选择，请先填写 TSE 审核结论', true); return; }
+    // 先把当前表单值保存到 ext_data（即使只点完成，数据也不丢）
+    const merged = Object.assign({}, step.ext_data || {}, {
+      pl_review: { result: plR, remark: plRemark },
+      tse_review: { result: tseR, remark: tseRemark },
+    });
+    step.ext_data = merged;
+    // 任一方选了 retest → 执行打回（status=rejected）
+    if (plR === 'retest' || tseR === 'retest') {
+      try {
+        await api(`/api/tasks/${taskId}/steps/${stepId}`, { method: 'PUT', body: { ext_data: merged } });
+        await api(`/api/tasks/${taskId}/steps/${stepId}`, { method: 'PUT', body: { status: 'rejected' } });
+        toast('已提交需补测，退回环节8（测试完成）由版本负责人组织补测后重新提交');
+        openTask(taskId);
+      } catch (e) { toast(e.message, true); }
+      return;
+    }
+    // 双方都 pass → 用合并后的 extData 下行
+    extData = merged;
   }
   try {
     await api(`/api/tasks/${taskId}/steps/${stepId}`, { method: 'PUT', body: { status: 'completed', ext_data: extData } });
     toast('环节已完成');
     openTask(taskId);
+  } catch (e) { toast(e.message, true); }
+}
+async function saveDualReview(taskId, stepId) {
+  const step = stepCache.find(s => s.id === stepId);
+  if (!step) return;
+  const plResult = document.getElementById(`sf_${stepId}_pl_review_result`)?.value || '';
+  const plRemark = document.getElementById(`sf_${stepId}_pl_review_remark`)?.value || '';
+  const tseResult = document.getElementById(`sf_${stepId}_tse_review_result`)?.value || '';
+  const tseRemark = document.getElementById(`sf_${stepId}_tse_review_remark`)?.value || '';
+  const merged = Object.assign({}, step.ext_data || {}, {
+    pl_review: { result: plResult, remark: plRemark },
+    tse_review: { result: tseResult, remark: tseRemark },
+  });
+  try {
+    await api(`/api/tasks/${taskId}/steps/${stepId}`, { method: 'PUT', body: { ext_data: merged } });
+    step.ext_data = merged;
+    toast('审核结果已保存');
   } catch (e) { toast(e.message, true); }
 }
 
@@ -1563,7 +1948,7 @@ async function submitReviewStep(taskId, stepId, stepNo) {
   const status = decision === 'pass' ? 'completed' : 'rejected';
   try {
     const result = await api(`/api/tasks/${taskId}/steps/${stepId}`, { method: 'PUT', body: { status, remark: extData.remark || extData.review_comment || '' } });
-    toast(stepNo === 5 && decision === 'reject' ? '已打回，环境确认环节重新处理' : (stepNo === 9 && decision === 'retest' ? '需补测，环节5~8已退回，环节5处理人已改为版本负责人' : '审核已通过'));
+    toast(stepNo === 5 && decision === 'reject' ? '已打回，环境确认环节重新处理' : (stepNo === 9 && decision === 'retest' ? '需补测，退回环节8（测试完成）由版本负责人组织补测' : '审核已通过'));
     openTask(taskId);
   } catch (e) { toast(e.message, true); }
 }
@@ -2153,6 +2538,7 @@ function renderCaseAssignSection(s, taskId, isCurrent, canOperate) {
       <b>📋 测试用例分配</b>
       ${canEdit ? `
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <button class="btn btn-sm" onclick="openExecManageModal(${taskId}, ${s.id}, false)" title="添加/移除本任务的测试执行人">⚙ 执行人管理</button>
         <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer">
           <input type="checkbox" id="caseAssignSelectAll_${s.id}" onchange="toggleCaseAssignSelectAll(${s.id}, this.checked)" style="cursor:pointer">
           <span>全选</span>
@@ -2202,7 +2588,21 @@ async function batchAssignCases(taskId, stepId) {
     const sel = document.getElementById(`caseAssign_${stepId}_${caseId}`);
     if (sel) sel.value = String(userId);
   });
-  toast(`已为 ${checked.length} 条用例指派执行人，点击"保存全部"提交`);
+  // 指派后自动保存到后端（无需再手动点"保存全部"）
+  try {
+    const step = stepCache.find(s => s.id === stepId);
+    const assignments = {};
+    document.querySelectorAll(`select[id^="caseAssign_${stepId}_"]`).forEach(sel => {
+      const cid = sel.id.replace(`caseAssign_${stepId}_`, '');
+      if (sel.value) assignments[cid] = parseInt(sel.value);
+    });
+    const merged = Object.assign({}, step?.ext_data || {}, { case_assignments: assignments });
+    await api(`/api/tasks/${taskId}/steps/${stepId}`, { method: 'PUT', body: { ext_data: merged } });
+    if (step) step.ext_data = merged;
+    toast(`已为 ${checked.length} 条用例指派执行人并保存`);
+  } catch (e) { toast('保存失败：' + e.message, true); }
+  const allCb = document.getElementById(`caseAssignAll_${stepId}`);
+  if (allCb) { allCb.checked = false; document.querySelectorAll(`input[id^="caseAssignChk_${stepId}_"]`).forEach(c => c.checked = false); }
 }
 
 async function loadCaseAssignments(stepId, taskId, canEdit) {
@@ -2311,11 +2711,15 @@ function renderCaseSection(s, taskId, isCurrent, canOperate) {
       <div id="linkedCasesList_${s.id}"><span class="muted" style="font-size:13px">加载中…</span></div>
     </div>`;
   } else {
-    // 步骤6：执行结果
+    // 步骤7：执行测试 - 每个用例显示为超链接，点击弹出步骤执行弹窗
+    const canManageExec = currentUser && currentTask && (currentUser.id === currentTask.owner || currentUser.id === currentTask.version_owner || (currentUser.roles || []).includes('admin'));
     return `<div class="step-cases" id="caseSection_${s.id}" style="margin-top:12px">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-        <b>用例执行结果</b>
-        <span id="caseStats_${s.id}" class="muted" style="font-size:12px">加载中…</span>
+        <b>用例执行</b>
+        <span style="display:flex;gap:8px;align-items:center">
+          ${canManageExec ? `<button class="btn btn-sm" onclick="openExecManageModal(${taskId}, ${s.id})">⚙ 执行人与用例指派</button>` : ''}
+          <span id="caseStats_${s.id}" class="muted" style="font-size:12px">加载中…</span>
+        </span>
       </div>
       <div id="linkedCasesList_${s.id}"><span class="muted" style="font-size:13px">加载中…</span></div>
     </div>`;
@@ -2348,88 +2752,64 @@ async function loadLinkedCases(taskId, stepId) {
       (currentTask.executors || []).some(e => e.user_id === currentUser.id)
     );
     const canEdit = isCurrent && (isAssignee || isAllHands || isTaskExecutor);
-    // step 7 执行测试环节：每用例展开为多步骤列表，每步骤可单独填结果+附件
+    // step 7 执行测试环节：表格展示用例
     if (isStep7) {
-      list.innerHTML = linkedCasesCache.map((c, idx) => {
-        const statusBadge = c.latest_result
-          ? `<span class="badge ${c.latest_result.status === 'pass' ? 'badge-green' : c.latest_result.status === 'fail' ? 'badge-red' : 'badge-amber'}" style="margin-left:6px">${{pass:'通过',fail:'失败',block:'阻塞',na:'N/A'}[c.latest_result.status]}</span>`
-          : '<span class="badge badge-gray" style="margin-left:6px">待执行</span>';
-        // 已有步骤级结果：latest_result.step_results = [{step_idx, actual, status}]
-        const stepResMap = {};
-        if (c.latest_result && Array.isArray(c.latest_result.step_results)) {
-          c.latest_result.step_results.forEach(s => { stepResMap[s.step_idx] = s; });
-        }
-        const steps = Array.isArray(c.steps) ? c.steps : [];
-        // 步骤列表
-        const stepsHtml = steps.length ? `
-          <div style="margin-top:6px">
-            ${steps.map((s, si) => {
-              const sr = stepResMap[si] || {};
-              const stepStatus = sr.status || '';
-              const stepBadge = stepStatus ? `<span class="badge ${stepStatus === 'pass' ? 'badge-green' : stepStatus === 'fail' ? 'badge-red' : 'badge-amber'}" style="margin-left:6px;font-size:10px">${{pass:'通过',fail:'失败',block:'阻塞'}[stepStatus] || stepStatus}</span>` : '';
-              const showStepDetail = stepStatus === 'fail' || stepStatus === 'block';
-              return `<div style="padding:8px 0;border-top:1px dashed var(--border)">
-                <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
-                  <div style="flex:1;min-width:0">
-                    <div style="font-size:12px;color:var(--muted);margin-bottom:2px">步骤 ${si+1}</div>
-                    <div style="font-size:13px;margin-bottom:4px">${esc(s.desc || '')}</div>
-                    ${s.expect ? `<div style="font-size:12px;color:var(--muted)">预期：${esc(s.expect)}</div>` : ''}
-                  </div>
-                  <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
-                    <div style="font-size:11px">${stepBadge || '<span class="badge badge-gray" style="font-size:10px">未测</span>'}</div>
-                    ${canEdit ? `<span style="white-space:nowrap">
-                      <button class="btn btn-sm" style="padding:1px 5px;font-size:10px;background:#dcfce7;color:#16a34a" onclick="recordCaseStepResult(${taskId}, ${c.id}, ${si}, 'pass')">✓</button>
-                      <button class="btn btn-sm" style="padding:1px 5px;font-size:10px;background:#fee2e2;color:#dc2626" onclick="recordCaseStepResult(${taskId}, ${c.id}, ${si}, 'fail')">✗</button>
-                      <button class="btn btn-sm" style="padding:1px 5px;font-size:10px;background:#fef3c7;color:#d97706" onclick="recordCaseStepResult(${taskId}, ${c.id}, ${si}, 'block')">⏸</button>
-                    </span>` : ''}
-                  </div>
-                </div>
-                ${showStepDetail && canEdit ? `
-                <div style="margin-top:6px;padding:6px;background:var(--bg);border-radius:4px;border-left:3px solid ${stepStatus === 'fail' ? '#dc2626' : '#d97706'}">
-                  <textarea id="stepActual_${stepId}_${c.id}_${si}" rows="2" placeholder="实际情况描述（必填）" style="width:100%;font-size:12px;margin-bottom:4px">${esc(sr.actual || '')}</textarea>
-                  <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
-                    <label class="btn btn-sm" style="cursor:pointer;padding:1px 6px;font-size:10px;background:var(--primary-light);color:var(--primary)">
-                      <input type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.txt,.csv,.md,.json,.png,.jpg,.jpeg,.gif,.bmp,.webp,.zip,.tar,.gz,.7z,.rar,.log" style="display:none" onchange="uploadStepIssueFile(${taskId}, ${stepId}, ${c.id}, ${si}, this)">
-                      <span>📎 附件</span>
-                    </label>
-                    <button class="btn btn-sm" style="padding:1px 6px;font-size:10px;background:#dbeafe;color:#2563eb" onclick="saveStepActual(${taskId}, ${c.id}, ${si}, ${stepId})">💾 保存</button>
-                  </div>
-                  <div id="stepFiles_${stepId}_${c.id}_${si}" style="margin-top:4px"><span class="muted" style="font-size:10px">附件加载中...</span></div>
-                </div>` : (showStepDetail ? `
-                <div style="margin-top:6px;padding:4px 8px;background:var(--bg);border-radius:4px;border-left:3px solid ${stepStatus === 'fail' ? '#dc2626' : '#d97706'}">
-                  <div style="font-size:12px;color:var(--muted)">实际情况：${esc(sr.actual || '—')}</div>
-                  <div id="stepFiles_${stepId}_${c.id}_${si}" style="margin-top:4px"><span class="muted" style="font-size:10px">附件加载中...</span></div>
-                </div>` : '')}
-              </div>`;
+      const step6 = stepCache.find(s => s.step === 6);
+      const assignments = (step6?.ext_data?.case_assignments) || {};
+      const priClass = p => p === 1 ? 'badge-red' : p === 2 ? 'badge-amber' : 'badge-blue';
+      list.innerHTML = `
+        <table style="table-layout:fixed;width:100%;border-collapse:collapse;font-size:13px">
+          <thead>
+            <tr style="background:var(--bg);border-bottom:2px solid var(--border)">
+              <th style="padding:8px 10px;text-align:left;width:55px">ID</th>
+              <th style="padding:8px 10px;text-align:left">用例名称</th>
+              <th style="padding:8px 10px;text-align:center;width:65px">优先级</th>
+              <th style="padding:8px 10px;text-align:left;width:80px">指派给</th>
+              <th style="padding:8px 10px;text-align:left;width:80px">创建者</th>
+              <th style="padding:8px 10px;text-align:left;width:80px">执行人</th>
+              <th style="padding:8px 10px;text-align:left;width:120px">执行时间</th>
+              <th style="padding:8px 10px;text-align:center;width:65px">结果</th>
+              <th style="padding:8px 10px;text-align:center;width:85px">操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${linkedCasesCache.map(c => {
+              const assignedUid = assignments[String(c.id)] || assignments[c.id];
+              const assignedName = assignedUid ? esc(userName(parseInt(assignedUid))) : '未分配';
+              const creatorName = c.created_by ? esc(userName(c.created_by)) : '—';
+              const execUid = c.latest_result?.executor_id;
+              const execName = execUid ? esc(userName(execUid)) : '—';
+              const execTime = c.latest_result?.executed_at ? formatDateTime(c.latest_result.executed_at) : '—';
+              const status = c.latest_result?.status;
+              const statusBadge = status
+                ? `<span class="badge ${status === 'pass' ? 'badge-green' : status === 'fail' ? 'badge-red' : 'badge-amber'}" style="font-size:11px">${{pass:'通过',fail:'失败',block:'阻塞',na:'不支持'}[status]}</span>`
+                : '<span class="badge badge-gray" style="font-size:11px">待执行</span>';
+              const isMyCase = canEdit && assignedUid && parseInt(assignedUid) === currentUser.id;
+              const opLabel = isMyCase ? '▶ 执行' : '👁 查看';
+              const pri = parseInt(c.priority) || 3;
+              return `<tr style="border-bottom:1px solid var(--border)">
+                <td style="padding:8px 10px;color:var(--muted);font-size:12px">${c.id}</td>
+                <td style="padding:8px 10px">
+                  <a href="javascript:openCaseExecModal(${taskId}, ${c.id}, ${stepId}, ${canEdit ? 'true' : 'false'})" title="${esc(c.title)}" style="color:var(--primary);text-decoration:none;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:340px">${esc(c.title || '#' + c.zentao_case_id)}</a>
+                </td>
+                <td style="padding:8px 10px;text-align:center"><span class="badge ${priClass(pri)}" style="font-size:11px">P${pri}</span></td>
+                <td style="padding:8px 10px;font-size:12px">${assignedName}</td>
+                <td style="padding:8px 10px;font-size:12px;color:var(--muted)">${creatorName}</td>
+                <td style="padding:8px 10px;font-size:12px;color:var(--muted)">${execName}</td>
+                <td style="padding:8px 10px;font-size:12px;color:var(--muted)">${execTime}</td>
+                <td style="padding:8px 10px;text-align:center">${statusBadge}</td>
+                <td style="padding:8px 10px;text-align:center">
+                  <button class="btn btn-sm" style="padding:2px 8px;font-size:11px;white-space:nowrap" onclick="openCaseExecModal(${taskId}, ${c.id}, ${stepId}, ${canEdit ? 'true' : 'false'})">${opLabel}</button>
+                </td>
+              </tr>`;
             }).join('')}
-          </div>` : '<div class="muted" style="font-size:12px;padding:6px 0">该用例没有步骤数据</div>';
-        return `<div style="padding:8px 0;border-bottom:1px solid var(--border)">
-          <div style="display:flex;align-items:center">
-            <span style="flex:1;font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(c.title)}">${idx+1}. ${esc(c.title || '#' + c.zentao_case_id)}${statusBadge}</span>
-          </div>
-          ${c.precondition ? `<div style="font-size:12px;color:var(--muted);margin-top:4px">前置条件：${esc(c.precondition)}</div>` : ''}
-          ${stepsHtml}
-        </div>`;
-      }).join('');
-      // step 7: 加载每个失败/阻塞步骤的附件
-      linkedCasesCache.forEach(c => {
-        const steps = Array.isArray(c.steps) ? c.steps : [];
-        const stepResMap = {};
-        if (c.latest_result && Array.isArray(c.latest_result.step_results)) {
-          c.latest_result.step_results.forEach(s => { stepResMap[s.step_idx] = s; });
-        }
-        steps.forEach((s, si) => {
-          const sr = stepResMap[si] || {};
-          if (sr.status === 'fail' || sr.status === 'block') {
-            loadStepIssueFiles(stepId, c.id, si);
-          }
-        });
-      });
+          </tbody>
+        </table>`;
     } else {
       // 非 step 7：旧列表渲染（关联/取消关联用例）
       list.innerHTML = linkedCasesCache.map((c, idx) => {
         const statusBadge = c.latest_result
-          ? `<span class="badge ${c.latest_result.status === 'pass' ? 'badge-green' : c.latest_result.status === 'fail' ? 'badge-red' : 'badge-amber'}" style="margin-left:6px">${{pass:'通过',fail:'失败',block:'阻塞',na:'N/A'}[c.latest_result.status]}</span>`
+          ? `<span class="badge ${c.latest_result.status === 'pass' ? 'badge-green' : c.latest_result.status === 'fail' ? 'badge-red' : 'badge-amber'}" style="margin-left:6px">${{pass:'通过',fail:'失败',block:'阻塞',na:'不支持'}[c.latest_result.status]}</span>`
           : '<span class="badge badge-gray" style="margin-left:6px">待执行</span>';
         const delBtn = canEdit ? ` <button class="btn btn-sm" style="padding:1px 6px;font-size:11px;color:var(--danger)" onclick="unlinkCase(${taskId}, ${c.id}, '${esc(c.title).replace(/'/g,"")}')">取消关联</button>` : '';
         return `<div style="display:flex;align-items:center;padding:6px 0;border-bottom:1px solid var(--border)">
@@ -2441,61 +2821,354 @@ async function loadLinkedCases(taskId, stepId) {
   } catch (e) {}
 }
 
-// ============ 步骤级测试结果录入 ============
-async function recordCaseStepResult(taskId, linkId, stepIdx, status) {
-  // 从对应文本框读取实际情况（失败/阻塞时）
-  const step7 = stepCache.find(s => s.step === 7);
-  let actual = '';
-  if ((status === 'fail' || status === 'block') && step7) {
-    const ta = document.getElementById(`stepActual_${step7.id}_${linkId}_${stepIdx}`);
-    if (ta) actual = ta.value.trim();
+// ============ 用例执行弹窗（步骤7） ============
+let caseExecCtx = null; // { taskId, linkId, stepId, canEdit, caseData }
+
+let execManageCtx = null;
+
+function openExecManageModal(taskId, step7Id, showAssign = true) {
+  execManageCtx = { taskId, step7Id, showAssign };
+  renderExecManage();
+  document.getElementById('execManageModal').classList.add('show');
+}
+
+function renderExecManage() {
+  const { taskId } = execManageCtx;
+  const body = document.getElementById('execManageBody');
+  const executors = currentTask?.executors || [];
+  const removed = execManageCtx.removed || new Set();
+  const executorIds = new Set();
+  if (currentTask?.executor_id && !removed.has(currentTask.executor_id)) executorIds.add(currentTask.executor_id);
+  executors.forEach(e => { if (e.user_id && !removed.has(e.user_id)) executorIds.add(e.user_id); });
+  if (execManageCtx.added) execManageCtx.added.forEach(uid => { if (!removed.has(uid)) executorIds.add(uid); });
+  // 可选执行人：有 executor 角色的用户
+  const executorUsers = (usersCache || []).filter(u =>
+    (u.roles || []).includes('executor') && !executorIds.has(u.id)
+  );
+  const step6 = stepCache.find(s => s.step === 6);
+  const assignments = (step6?.ext_data?.case_assignments) || {};
+  body.innerHTML = `
+    <div style="margin-bottom:16px">
+      <b style="font-size:14px">当前执行人</b>
+      <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">
+        ${Array.from(executorIds).map(uid => `<span class="badge badge-blue">${esc(userName(uid))} <a href="javascript:removeExecManager(${uid})" style="color:inherit;text-decoration:none;font-weight:700;margin-left:2px" title="移除">×</a></span>`).join('') || '<span class="muted">暂无</span>'}
+      </div>
+      <div style="margin-top:10px;display:flex;gap:8px;align-items:center">
+        <select id="emAddUser" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px">
+          <option value="">— 添加执行人 —</option>
+          ${executorUsers.map(u => `<option value="${u.id}">${esc(u.realname || u.account)}</option>`).join('')}
+        </select>
+        <button class="btn btn-sm btn-primary" onclick="addExecManager()">+ 添加</button>
+      </div>
+      <div id="emAddedList" style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap"></div>
+    </div>
+    ${execManageCtx.showAssign === false ? '' : `
+    <div>
+      <b style="font-size:14px">用例指派</b>
+      <div style="margin-top:8px">
+        ${linkedCasesCache.map(c => `
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)">
+            <span style="font-size:13px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(c.title)}">${esc(c.title || '#' + c.zentao_case_id)}</span>
+            <select id="emAssign_${c.id}" style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;margin-left:12px;width:140px">
+              <option value="">— 未分配 —</option>
+              ${Array.from(executorIds).map(uid => `<option value="${uid}" ${assignments[String(c.id)] === uid ? 'selected' : ''}>${esc(userName(uid))}</option>`).join('')}
+            </select>
+          </div>
+        `).join('')}
+      </div>
+    </div>`}`;
+}
+
+function addExecManager() {
+  const sel = document.getElementById('emAddUser');
+  if (!sel || !sel.value) return;
+  const uid = parseInt(sel.value);
+  if (!execManageCtx.added) execManageCtx.added = new Set();
+  execManageCtx.added.add(uid);
+  if (execManageCtx.removed) execManageCtx.removed.delete(uid);
+  // 刷新渲染，把新加的人加入 executorIds
+  renderExecManage();
+}
+
+function removeExecManager(uid) {
+  if (!execManageCtx.removed) execManageCtx.removed = new Set();
+  execManageCtx.removed.add(uid);
+  if (execManageCtx.added) execManageCtx.added.delete(uid);
+  // 被移除人名下已指派的用例需清空，避免数据指向不存在的人
+  const step6 = stepCache.find(s => s.step === 6);
+  if (step6 && step6.ext_data && step6.ext_data.case_assignments) {
+    const asg = Object.assign({}, step6.ext_data.case_assignments);
+    Object.keys(asg).forEach(k => { if (parseInt(asg[k]) === uid) delete asg[k]; });
+    step6.ext_data = Object.assign({}, step6.ext_data, { case_assignments: asg });
   }
-  // 拉当前用例最新的 step_results，更新对应 step_idx
-  const c = linkedCasesCache.find(x => x.id === linkId);
-  let stepResults = [];
-  if (c && c.latest_result && Array.isArray(c.latest_result.step_results)) {
-    stepResults = [...c.latest_result.step_results];
-  }
-  // 找到对应 step_idx 并更新
-  const existing = stepResults.findIndex(s => s.step_idx === stepIdx);
-  if (existing >= 0) {
-    stepResults[existing] = { step_idx: stepIdx, status, actual: actual || stepResults[existing].actual };
-  } else {
-    stepResults.push({ step_idx: stepIdx, status, actual });
-  }
-  // 整体状态：任一失败→失败；任一阻塞→阻塞；否则通过
-  const hasFail = stepResults.some(s => s.status === 'fail');
-  const hasBlock = stepResults.some(s => s.status === 'block');
-  const overall = hasFail ? 'fail' : hasBlock ? 'block' : 'pass';
+  renderExecManage();
+}
+
+async function saveExecManage() {
+  const { taskId, added } = execManageCtx;
+  const removed = execManageCtx.removed || new Set();
   try {
-    const r = await api(`/api/tasks/${taskId}/cases/${linkId}/result`, { method: 'POST', body: { status: overall, step_results: stepResults } });
-    toast(`步骤 ${stepIdx+1} 已记录：${{pass:'通过',fail:'失败',block:'阻塞'}[status]}`);
-    // 更新本地 cache
-    if (c) {
-      if (!c.latest_result) c.latest_result = { status: overall, comment: '', step_results: stepResults };
-      else { c.latest_result.status = overall; c.latest_result.step_results = stepResults; }
+    // 1. 更新任务 executors
+    const finalIds = [];
+    const pushUid = uid => { const n = parseInt(uid); if (n && !removed.has(n) && !finalIds.includes(n)) finalIds.push(n); };
+    if (currentTask?.executor_id) pushUid(currentTask.executor_id);
+    (currentTask?.executors || []).forEach(e => pushUid(e.user_id));
+    if (added) added.forEach(uid => pushUid(uid));
+    if (finalIds.length === 0) {
+      toast('至少需要保留一名测试执行人', true);
+      return;
     }
-    if (step7) loadLinkedCases(taskId, step7.id);
+    const executors = finalIds.map(uid => ({ user_id: uid }));
+    const payload = { executors };
+    // 主执行人被移除时，由保留下来的第一位顺位接任
+    if (!currentTask?.executor_id || removed.has(currentTask.executor_id)) {
+      payload.executor_id = finalIds[0];
+    }
+    await api(`/api/tasks/${taskId}`, { method: 'PUT', body: payload });
+    currentTask.executors = executors;
+    if (payload.executor_id) currentTask.executor_id = payload.executor_id;
+    // 2. 更新 step 6 的 case_assignments
+    const step6 = stepCache.find(s => s.step === 6);
+    const assignSels = document.querySelectorAll('select[id^="emAssign_"]');
+    let merged = null;
+    if (step6 && execManageCtx.showAssign !== false && assignSels.length) {
+      // 弹窗里展示了用例指派 → 以下拉的值为准
+      const assignments = {};
+      assignSels.forEach(sel => {
+        const caseId = sel.id.replace('emAssign_', '');
+        if (sel.value) assignments[caseId] = parseInt(sel.value);
+      });
+      merged = Object.assign({}, step6.ext_data || {}, { case_assignments: assignments });
+    } else if (step6 && step6.ext_data && step6.ext_data.case_assignments) {
+      // 只管人模式 → 保存 removeExecManager 清理过的指派（移除的人名下用例要清空）
+      merged = Object.assign({}, step6.ext_data);
+    }
+    if (merged) {
+      await api(`/api/tasks/${taskId}/steps/${step6.id}`, { method: 'PUT', body: { ext_data: merged } });
+      step6.ext_data = merged;
+    }
+    toast(execManageCtx.showAssign === false ? '测试执行人已更新' : '执行人与用例指派已更新');
+    closeModal('execManageModal');
+    openTask(taskId);
   } catch (e) { toast(e.message, true); }
 }
 
-async function saveStepActual(taskId, linkId, stepIdx, stepId) {
+function openCaseExecModal(taskId, linkId, stepId, canEdit) {
+  const c = linkedCasesCache.find(x => x.id === linkId);
+  if (!c) { toast('用例数据不存在，请刷新页面重试', true); return; }
+  // 权限校验：只有被分配给自己的用例才能编辑（admin 也不例外，需先分配给自己）
+  const step6 = stepCache.find(s => s.step === 6);
+  const assignments = (step6?.ext_data?.case_assignments) || {};
+  const assignedUid = assignments[String(c.id)] || assignments[c.id];
+  const isAssignedToMe = assignedUid && parseInt(assignedUid) === currentUser.id;
+  const finalCanEdit = canEdit && isAssignedToMe;
+  // pendingResults: 本次弹窗内的临时编辑结果，确认时才提交；关闭/取消则丢弃
+  const initialResults = (c.latest_result && Array.isArray(c.latest_result.step_results))
+    ? JSON.parse(JSON.stringify(c.latest_result.step_results))
+    : [];
+  caseExecCtx = { taskId, linkId, stepId, canEdit: finalCanEdit, caseData: c, isAssignedToMe, assignedUid, pendingResults: initialResults };
+  document.getElementById('caseExecTitle').textContent = `用例执行：${c.title || '#' + c.zentao_case_id}`;
+  renderCaseExecBody();
+  document.getElementById('caseExecModal').classList.add('show');
+}
+
+function renderCaseExecBody() {
+  const { taskId, linkId, stepId, canEdit, caseData: c, isAssignedToMe, assignedUid, pendingResults } = caseExecCtx;
+  const body = document.getElementById('caseExecBody');
+  // 先从 pending 计算整体状态；pending 为空时回退到已有结果
+  const hasPending = pendingResults && pendingResults.length;
+  const overallStatus = hasPending
+    ? deriveOverallStatus(pendingResults)
+    : (c.latest_result?.status || null);
+  const overallBadge = overallStatus
+    ? `<span class="badge ${overallStatus === 'pass' ? 'badge-green' : overallStatus === 'fail' ? 'badge-red' : 'badge-amber'}">${{pass:'通过',fail:'失败',block:'阻塞',na:'不支持'}[overallStatus]}</span>`
+    : '<span class="badge badge-gray">待执行</span>';
+  // 优先使用 pending 结果；pending 为空时回退到已有结果
+  const activeStepResults = hasPending ? pendingResults : (c.latest_result?.step_results || []);
+  const stepResMap = {};
+  activeStepResults.forEach(s => { stepResMap[s.step_idx] = s; });
+  const steps = Array.isArray(c.steps) ? c.steps : [];
+  const assignedName = assignedUid ? userName(parseInt(assignedUid)) : '未分配';
+  let html = `
+    <div style="margin-bottom:12px;padding:10px 12px;background:var(--bg);border-radius:8px">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+      <div>
+        <b style="font-size:14px">${esc(c.title)}</b>
+        ${overallBadge}
+      </div>
+      <div style="font-size:12px;color:var(--muted)">共 ${steps.length} 步 ｜ 分配给：<b>${esc(assignedName)}</b></div>
+    </div>
+    ${!isAssignedToMe ? `<div style="margin-top:6px;padding:6px 10px;background:#fef3c7;border-radius:6px;font-size:12px;color:#92400e">⚠ 该用例分配给 <b>${esc(assignedName)}</b>，你只能查看不能编辑</div>` : ''}
+    ${c.precondition ? `<div style="font-size:12px;color:var(--muted);margin-top:6px"><b>前置条件：</b>${esc(c.precondition)}</div>` : ''}
+    <div style="font-size:11px;color:var(--muted);margin-top:6px">规则：任一步骤失败→用例失败；任一阻塞→用例阻塞；全部通过→用例通过</div>
+  </div>`;
+  if (!steps.length) {
+    html += '<div class="empty">该用例没有步骤数据</div>';
+  } else {
+    html += steps.map((s, si) => {
+      const sr = stepResMap[si] || {};
+      const stepStatus = sr.status || '';
+      const stepBadge = stepStatus
+        ? `<span class="badge ${stepStatus === 'pass' ? 'badge-green' : stepStatus === 'fail' ? 'badge-red' : 'badge-amber'}" style="font-size:11px">${{pass:'通过',fail:'失败',block:'阻塞'}[stepStatus]}</span>`
+        : '<span class="badge badge-gray" style="font-size:11px">未测</span>';
+      const showStepDetail = stepStatus === 'fail' || stepStatus === 'block';
+      return `<div style="padding:10px 0;border-top:1px dashed var(--border)">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+          <div style="flex:1;min-width:0">
+            <div style="font-size:12px;color:var(--muted);margin-bottom:3px">步骤 ${si+1}</div>
+            <div style="font-size:13px;margin-bottom:4px">${esc(s.desc || '')}</div>
+            ${s.expect ? `<div style="font-size:12px;color:var(--muted)"><b>预期：</b>${esc(s.expect)}</div>` : ''}
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
+            <div>${stepBadge}</div>
+            ${canEdit ? `<span style="white-space:nowrap">
+              <button class="btn btn-sm" style="padding:2px 8px;font-size:11px;background:#dcfce7;color:#16a34a" onclick="recordCaseStepResult(${taskId}, ${linkId}, ${si}, 'pass')">✓ 通过</button>
+              <button class="btn btn-sm" style="padding:2px 8px;font-size:11px;background:#fee2e2;color:#dc2626" onclick="recordCaseStepResult(${taskId}, ${linkId}, ${si}, 'fail')">✗ 失败</button>
+              <button class="btn btn-sm" style="padding:2px 8px;font-size:11px;background:#fef3c7;color:#d97706" onclick="recordCaseStepResult(${taskId}, ${linkId}, ${si}, 'block')">⏸ 阻塞</button>
+              <button class="btn btn-sm" style="padding:2px 8px;font-size:11px;background:#f1f5f9;color:#64748b" onclick="recordCaseStepResult(${taskId}, ${linkId}, ${si}, 'na')">⊘ 不支持</button>
+            </span>` : ''}
+          </div>
+        </div>
+        ${showStepDetail && canEdit ? `
+        <div style="margin-top:8px;padding:8px 10px;background:#fffbeb;border-radius:6px;border-left:3px solid ${stepStatus === 'fail' ? '#dc2626' : '#d97706'}">
+          <div style="font-size:12px;color:var(--text-sub);margin-bottom:4px"><b>失败/阻塞原因（必填）：</b></div>
+          <textarea id="stepActual_${stepId}_${linkId}_${si}" rows="2" placeholder="请填写实际情况描述" style="width:100%;font-size:12px;margin-bottom:6px;padding:6px;border:1px solid var(--border);border-radius:4px">${esc(sr.actual || '')}</textarea>
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+            <label class="btn btn-sm" style="cursor:pointer;padding:3px 10px;font-size:11px;background:var(--primary-light);color:var(--primary)">
+              <input type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.txt,.csv,.md,.json,.png,.jpg,.jpeg,.gif,.bmp,.webp,.zip,.tar,.gz,.7z,.rar,.log" style="display:none" onchange="uploadStepIssueFile(${taskId}, ${stepId}, ${linkId}, ${si}, this)">
+              <span>📎 上传附件</span>
+            </label>
+            <button class="btn btn-sm" style="padding:3px 10px;font-size:11px;background:#dbeafe;color:#2563eb" onclick="saveStepActual(${taskId}, ${linkId}, ${si}, ${stepId})">💾 保存原因</button>
+          </div>
+          <div id="stepFiles_${stepId}_${linkId}_${si}" style="margin-top:6px"><span class="muted" style="font-size:11px">附件加载中...</span></div>
+        </div>` : (showStepDetail ? `
+        <div style="margin-top:8px;padding:6px 10px;background:#fffbeb;border-radius:6px;border-left:3px solid ${stepStatus === 'fail' ? '#dc2626' : '#d97706'}">
+          <div style="font-size:12px;color:var(--text-sub)"><b>实际情况：</b>${esc(sr.actual || '—')}</div>
+          <div id="stepFiles_${stepId}_${linkId}_${si}" style="margin-top:4px"><span class="muted" style="font-size:11px">附件加载中...</span></div>
+        </div>` : '')}
+      </div>`;
+    }).join('');
+  }
+  if (canEdit && steps.length) {
+    html += `<div style="margin-top:10px;padding:8px 10px;background:var(--primary-light);border-radius:6px;font-size:12px;color:var(--primary)">提示：步骤标记为「失败」时，必须填写原因并上传附件（截图/日志）；标记为「阻塞」时，必须填写原因；否则点「确认」不会生效</div>`;
+  }
+  body.innerHTML = html;
+  // 加载已上传附件
+  steps.forEach((s, si) => {
+    const sr = stepResMap[si] || {};
+    if (sr.status === 'fail' || sr.status === 'block') {
+      loadStepIssueFiles(stepId, linkId, si);
+    }
+  });
+}
+
+// 根据步骤结果推导用例整体状态
+function deriveOverallStatus(stepResults) {
+  if (!stepResults || !stepResults.length) return null;
+  const hasFail = stepResults.some(s => s.status === 'fail');
+  const hasBlock = stepResults.some(s => s.status === 'block');
+  const allNa = stepResults.every(s => s.status === 'na');
+  if (hasFail) return 'fail';
+  if (hasBlock) return 'block';
+  if (allNa) return 'na';
+  return 'pass';
+}
+
+// ============ 用例执行弹窗：确认 ============
+function caseStepHasFile(files, caseId, stepIdx) {
+  return (files || []).some(f => (f.category || '') === `case_step:${caseId}:${stepIdx}`);
+}
+
+async function confirmCaseExec() {
+  if (!caseExecCtx) { closeModal('caseExecModal'); return; }
+  const { taskId, linkId, stepId, canEdit, pendingResults } = caseExecCtx;
+  // 只读（用例未分配给自己）：确认即关闭
+  if (!canEdit) { closeModal('caseExecModal'); return; }
+  const c = linkedCasesCache.find(x => x.id === linkId) || caseExecCtx.caseData;
+  const steps = Array.isArray(c?.steps) ? c.steps : [];
+  const stepResults = pendingResults || [];
+  // 先把当前 textarea 里的内容同步到 pending，避免用户没点「保存原因」
+  steps.forEach((s, si) => {
+    const ta = document.getElementById(`stepActual_${stepId}_${linkId}_${si}`);
+    if (!ta) return;
+    const rec = stepResults.find(r => r.step_idx === si);
+    if (rec) rec.actual = ta.value.trim();
+  });
+  const problemSteps = steps.map((s, si) => ({ si, sr: stepResults.find(r => r.step_idx === si) }))
+    .filter(x => x.sr && (x.sr.status === 'fail' || x.sr.status === 'block'));
+  if (!problemSteps.length) {
+    // 没有失败/阻塞：直接提交 pending 后关闭
+    await submitCaseResult(taskId, linkId, c, stepResults);
+    return;
+  }
+  let files = [];
+  try { files = await api(`/api/tasks/${taskId}/steps/${stepId}/files`); } catch (e) { files = []; }
+  const problems = [];
+  problemSteps.forEach(({ si, sr }) => {
+    const reason = (sr.actual || '').trim();
+    if (!reason) {
+      problems.push(`步骤 ${si + 1} 未填写${sr.status === 'fail' ? '失败' : '阻塞'}原因`);
+    }
+    // 失败步骤必须上传附件；阻塞步骤只要求填写原因，附件可选
+    if (sr.status === 'fail' && !caseStepHasFile(files, linkId, si)) {
+      problems.push(`步骤 ${si + 1} 未上传附件（截图/日志）`);
+    }
+  });
+  if (problems.length) {
+    toast('无法确认：' + problems.join('；'), true);
+    return;
+  }
+  await submitCaseResult(taskId, linkId, c, stepResults);
+}
+
+async function submitCaseResult(taskId, linkId, c, stepResults) {
+  const overall = deriveOverallStatus(stepResults);
+  const payload = { status: overall || 'pass', step_results: stepResults };
+  try {
+    await api(`/api/tasks/${taskId}/cases/${linkId}/result`, { method: 'POST', body: payload });
+    // 更新本地 cache，让外层列表立即反映新结果
+    if (!c.latest_result) c.latest_result = { status: payload.status, comment: '', step_results: stepResults };
+    else { c.latest_result.status = payload.status; c.latest_result.step_results = stepResults; }
+    closeModal('caseExecModal');
+    const step7 = stepCache.find(s => s.step === 7);
+    if (step7) loadLinkedCases(taskId, step7.id);
+    toast('用例执行结果已确认');
+  } catch (e) { toast(e.message, true); }
+}
+
+// ============ 步骤级测试结果录入（仅更新 pending，确认时统一提交） ============
+function recordCaseStepResult(taskId, linkId, stepIdx, status) {
+  if (!caseExecCtx || caseExecCtx.linkId !== linkId) return;
+  const stepId = caseExecCtx.stepId;
+  const pending = caseExecCtx.pendingResults || (caseExecCtx.pendingResults = []);
+  // 从当前文本框读取实际情况（如果已填写）
+  let actual = '';
+  if (status === 'fail' || status === 'block') {
+    const ta = document.getElementById(`stepActual_${stepId}_${linkId}_${stepIdx}`);
+    if (ta) actual = ta.value.trim();
+  }
+  const existing = pending.findIndex(s => s.step_idx === stepIdx);
+  if (existing >= 0) {
+    pending[existing] = { step_idx: stepIdx, status, actual: actual || pending[existing].actual || '' };
+  } else {
+    pending.push({ step_idx: stepIdx, status, actual });
+  }
+  renderCaseExecBody();
+}
+
+function saveStepActual(taskId, linkId, stepIdx, stepId) {
+  if (!caseExecCtx || caseExecCtx.linkId !== linkId) return;
   const ta = document.getElementById(`stepActual_${stepId}_${linkId}_${stepIdx}`);
   if (!ta) return;
   const actual = ta.value.trim();
-  const c = linkedCasesCache.find(x => x.id === linkId);
-  if (!c || !c.latest_result || !Array.isArray(c.latest_result.step_results)) {
-    toast('请先选择该步骤的执行结果（失败/阻塞）', true); return;
+  const pending = caseExecCtx.pendingResults || (caseExecCtx.pendingResults = []);
+  const existing = pending.findIndex(s => s.step_idx === stepIdx);
+  if (existing >= 0) {
+    pending[existing].actual = actual;
+  } else {
+    pending.push({ step_idx: stepIdx, status: '', actual });
   }
-  const stepResults = [...c.latest_result.step_results];
-  const existing = stepResults.findIndex(s => s.step_idx === stepIdx);
-  if (existing < 0) { toast('请先选择该步骤的执行结果', true); return; }
-  stepResults[existing].actual = actual;
-  try {
-    await api(`/api/tasks/${taskId}/cases/${linkId}/result`, { method: 'POST', body: { status: c.latest_result.status, step_results: stepResults } });
-    c.latest_result.step_results = stepResults;
-    toast('实际情况已保存');
-  } catch (e) { toast(e.message, true); }
+  toast('原因已记录，点击「确认」后生效');
 }
 
 async function uploadStepIssueFile(taskId, stepId, caseId, stepIdx, input) {
@@ -2889,8 +3562,12 @@ function renderStepPage(stepNo) {
   const taskId = currentTask.id;
   const isCurrent = currentTask && parseInt(s.step) === parseInt(currentTask.current_step);
   // 操作权严格按 assigned_to 判断：admin 不再自动获得业务环节操作权
-  // admin 仍可查看所有任务、管理用户/产品项目；如需操作业务环节，需先在"人员与角色"页面把自己指派为该环节负责人
-  const canOperate = s.assigned_to === currentUser.id || s.step === 8 || s.assigned_to === null;
+  // 步骤7（执行测试）比较特殊：所有测试执行人（executor_id + executors 列表）都有操作权限
+  const isStep7Executor = s.step === 7 && currentTask && (
+    currentTask.executor_id === currentUser.id ||
+    (currentTask.executors || []).some(e => e.user_id === currentUser.id)
+  );
+  const canOperate = s.assigned_to === currentUser.id || s.assigned_to === null || isStep7Executor;
   const statusLabel = { pending:'待处理', in_progress:'进行中', completed:'已完成', rejected:'已驳回', done:'已完成' }[s.status] || s.status;
 
   let html = `<div class="card">
@@ -2899,7 +3576,12 @@ function renderStepPage(stepNo) {
         <h3 style="margin:0">步骤${s.step}：${esc(s.step_name)}</h3>
         <span class="badge badge-gray">${statusLabel}</span>
         ${isCurrent ? '<span class="badge badge-blue">当前环节</span>' : ''}
-        <span class="muted" style="font-size:13px">负责人：${s.assigned_to ? esc(userName(s.assigned_to)) : '全员'}</span>
+        <span class="muted" style="font-size:13px">负责人：${s.step === 7 ? (currentTask ? (() => {
+          const names = [];
+          if (currentTask.executor_id) names.push(userName(currentTask.executor_id));
+          (currentTask.executors || []).forEach(e => { if (e.user_id && !names.includes(userName(e.user_id))) names.push(userName(e.user_id)); });
+          return names.length ? esc(names.join('、')) : '—';
+        })() : '—') : (s.assigned_to ? esc(userName(s.assigned_to)) : (s.step === 9 && currentTask ? `PL:${esc(userName(currentTask.owner))} + TSE:${esc(userName(currentTask.tse_id))}` : '全员'))}</span>
       </div>
     </div>
     <div style="padding:16px 20px">
@@ -2976,7 +3658,7 @@ async function loadStepFiles(stepId) {
     }
     // 权限：admin 或步骤 assignee 或 全员环节 才能删除
     const s = stepCache.find(x => x.id === stepId);
-    const canDelete = currentUser && ((s && s.assigned_to === currentUser.id) || (s && (s.assigned_to === null || s.step === 8)));
+    const canDelete = currentUser && ((s && s.assigned_to === currentUser.id) || (s && s.assigned_to === null));
     listEl.innerHTML = files.map(f => {
       const dlUrl = `/api/tasks/${currentTask.id}/steps/${stepId}/files/${f.id}/download`;
       const ext = (f.original_name || '').split('.').pop().toLowerCase();
@@ -3108,13 +3790,16 @@ async function loadActions(taskId) {
 
 // ============ 创建任务 ============
 let executorRows = [];
+let executorSeq = 0; // 自增序号，作为行的唯一标识（避免删除后下标漂移）
 
 async function openCreateModal() {
   if (!usersCache.length) { toast('请先在「人员与角色」页添加用户', true); return; }
   ['cName','cVersion','cDesc','cBegin','cEnd'].forEach(id => document.getElementById(id).value = '');
   document.getElementById('cProduct').value = '';
   document.getElementById('cProject').value = '';
+  document.getElementById('cExecutor').value = '';
   executorRows = [];
+  executorSeq = 0;
   document.getElementById('executorsList').innerHTML = '';
   // 确保产品项目下拉已填充
   fillProductSelect('cProduct');
@@ -3127,38 +3812,69 @@ async function openCreateModal() {
 function closeModal(id) { document.getElementById(id).classList.remove('show'); }
 
 function addExecutorRow() {
-  const idx = executorRows.length;
-  executorRows.push({ user_id: '' });
-  // 仅展示 executor 角色用户
-  const executorUsers = (usersCache || []).filter(u => {
-    const roles = u.roles || (u.role ? [u.role] : []);
-    return roles.includes('executor');
-  });
-  const userOpts = executorUsers.map(u => `<option value="${u.id}">${esc(u.realname || u.account)}</option>`).join('');
+  const rowId = executorSeq++;
+  executorRows.push({ rowId, user_id: '' });
   const wrap = document.getElementById('executorsList');
   const row = document.createElement('div');
   row.className = 'form-row';
   row.style.cssText = 'align-items:center;padding:2px 0;margin-bottom:4px';
-  row.id = `execRow_${idx}`;
+  row.id = `execRow_${rowId}`;
   row.innerHTML = `
-    <div class="field" style="flex:1;margin:0"><label>测试执行人${idx + 2}</label><select id="execUser_${idx}" onchange="updateExecutorRow(${idx})">${userOpts}</select></div>
-    <div style="width:50px;text-align:right"><button type="button" class="btn btn-sm" style="color:var(--danger);padding:2px 8px" onclick="removeExecutorRow(${idx})">×</button></div>
+    <div class="field" style="flex:1;margin:0"><label>测试执行人</label><select id="execUser_${rowId}" onchange="updateExecutorRow(${rowId})"></select></div>
+    <div style="width:50px;text-align:right"><button type="button" class="btn btn-sm" style="color:var(--danger);padding:2px 8px" onclick="removeExecutorRow(${rowId})">×</button></div>
   `;
   wrap.appendChild(row);
+  refreshExecutorOptions();
 }
 
-function updateExecutorRow(idx) {
-  executorRows[idx] = { user_id: parseInt(document.getElementById(`execUser_${idx}`).value) || null };
+// 刷新所有执行人行：选项 = executor 角色用户 - 已被占用的（含主执行人）
+function refreshExecutorOptions() {
+  const sel = document.getElementById('cExecutor');
+  const primary = sel && sel.value ? parseInt(sel.value) : null;
+  const used = new Set();
+  if (primary) used.add(primary);
+  document.querySelectorAll('select[id^="execUser_"]').forEach(s => {
+    if (s.value) used.add(parseInt(s.value));
+  });
+  const executorUsers = (usersCache || []).filter(u => {
+    const roles = u.roles || (u.role ? [u.role] : []);
+    return roles.includes('executor');
+  });
+  document.querySelectorAll('select[id^="execUser_"]').forEach(s => {
+    const cur = s.value;
+    s.innerHTML = '<option value="">— 请选择 —</option>' + executorUsers
+      .filter(u => !used.has(u.id) || u.id === parseInt(cur))
+      .map(u => `<option value="${u.id}" ${String(u.id) === String(cur) ? 'selected' : ''}>${esc(u.realname || u.account)}</option>`)
+      .join('');
+  });
 }
 
-function removeExecutorRow(idx) {
-  executorRows[idx] = null;
-  const row = document.getElementById(`execRow_${idx}`);
+function updateExecutorRow(rowId) {
+  const el = document.getElementById(`execUser_${rowId}`);
+  const rec = executorRows.find(r => r.rowId === rowId);
+  const uid = el ? (parseInt(el.value) || null) : null;
+  if (rec) rec.user_id = uid;
+  refreshExecutorOptions();
+}
+
+function removeExecutorRow(rowId) {
+  executorRows = executorRows.filter(r => r.rowId !== rowId);
+  const row = document.getElementById(`execRow_${rowId}`);
   if (row) row.remove();
+  refreshExecutorOptions();
 }
 
+// 以界面上实际显示的下拉为准读取执行人，避免缓存与界面不同步导致丢人
 function collectExecutors() {
-  return executorRows.filter(r => r && r.user_id);
+  const seen = new Set();
+  const out = [];
+  document.querySelectorAll('select[id^="execUser_"]').forEach(s => {
+    const uid = parseInt(s.value);
+    if (!uid || seen.has(uid)) return;
+    seen.add(uid);
+    out.push({ user_id: uid });
+  });
+  return out;
 }
 
 async function createTask() {
@@ -3173,6 +3889,10 @@ async function createTask() {
   if (projectId) {
     const proj = zentaoProjectsCache.find(p => p.id == projectId);
     if (proj) {
+      // 项目必须有起止日期，否则任务周期无法对齐
+      if (!proj.begin_date || !proj.end_date) {
+        toast('该项目未设置起止日期，请先在「产品与项目」页编辑后再发起任务', true); return;
+      }
       const pBegin = proj.begin_date;
       const pEnd = proj.end_date;
       if (pBegin && begin && begin < pBegin) {
@@ -3190,6 +3910,9 @@ async function createTask() {
   }
   const productId = document.getElementById('cProduct').value;
   const productName = productId ? (zentaoProductsCache.find(p => p.id == productId) || {}).name : null;
+  const executorId = document.getElementById('cExecutor').value ? parseInt(document.getElementById('cExecutor').value) : null;
+  // 额外执行人：以界面为准收集，并去掉与主执行人重复的
+  const extraExecutors = collectExecutors().filter(e => e.user_id !== executorId);
   const body = {
     name,
     zentao_product_id: productId ? parseInt(productId) : null,
@@ -3200,8 +3923,8 @@ async function createTask() {
     owner: parseInt(owner),
     tse_id: document.getElementById('cTse').value ? parseInt(document.getElementById('cTse').value) : null,
     version_owner: document.getElementById('cVersionOwner').value ? parseInt(document.getElementById('cVersionOwner').value) : null,
-    executor_id: document.getElementById('cExecutor').value ? parseInt(document.getElementById('cExecutor').value) : null,
-    executors: collectExecutors(),
+    executor_id: executorId,
+    executors: extraExecutors.length ? extraExecutors : (executorId ? [{ user_id: executorId }] : []),
     begin_date: begin || null,
     end_date: end || null,
     description: document.getElementById('cDesc').value.trim() || null,
@@ -3452,22 +4175,71 @@ function renderPPProjects() {
   title.textContent = product ? `${product.name} · 项目` : '项目';
   if (!ppSelectedProductId || !product) {
     body.innerHTML = '<tr><td colspan="4" class="muted" style="padding:12px">请先在左侧选择一个产品</td></tr>';
+    renderPPOrphanProjects();
     return;
   }
   const projects = zentaoProjectsCache.filter(p => p.product_id === ppSelectedProductId);
   if (!projects.length) {
     body.innerHTML = '<tr><td colspan="4" class="muted" style="padding:12px">该产品下暂无项目，点击右上角"+ 新建项目"</td></tr>';
+  } else {
+    body.innerHTML = projects.map(p => `<tr>
+      <td style="font-weight:500">${esc(p.name)}</td>
+      <td class="muted">${esc(p.code || '—')}</td>
+      <td class="muted" style="font-size:12px">${p.begin_date && p.end_date ? `${esc(p.begin_date)} ~ ${esc(p.end_date)}` : (p.begin_date ? `${esc(p.begin_date)} ~ —` : '<span style="color:var(--danger)">未设置</span>')}</td>
+      <td>
+        <button class="btn btn-sm" onclick="openProjectModal(${p.id})">编辑</button>
+        <button class="btn btn-sm" style="color:var(--danger)" onclick="deletePPProject(${p.id})">删除</button>
+      </td>
+    </tr>`).join('');
+  }
+  // 同时渲染僵尸项目清理区
+  renderPPOrphanProjects();
+}
+
+// 渲染无产品关联的僵尸项目清理区
+function renderPPOrphanProjects() {
+  const box = document.getElementById('ppOrphanBox');
+  if (!box) return;
+  const orphans = zentaoProjectsCache.filter(p => !p.product_id);
+  if (!orphans.length) {
+    box.style.display = 'none';
+    box.innerHTML = '';
     return;
   }
-  body.innerHTML = projects.map(p => `<tr>
-    <td style="font-weight:500">${esc(p.name)}</td>
-    <td class="muted">${esc(p.code || '—')}</td>
-    <td class="muted" style="font-size:12px">${esc(p.begin_date || '?')} ~ ${esc(p.end_date || '?')}</td>
-    <td>
-      <button class="btn btn-sm" onclick="openProjectModal(${p.id})">编辑</button>
-      <button class="btn btn-sm" style="color:var(--danger)" onclick="deletePPProject(${p.id})">删除</button>
-    </td>
-  </tr>`).join('');
+  box.style.display = 'block';
+  box.innerHTML = `
+    <div style="border-top:2px dashed var(--border);padding-top:12px;margin-top:8px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <b style="color:var(--danger)">⚠ 无关联产品的僵尸项目 (${orphans.length})</b>
+        <button class="btn btn-sm" style="background:#fee2e2;color:#dc2626" onclick="deleteAllOrphanProjects()">一键清理全部</button>
+      </div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:8px">这些项目没有关联到任何产品（多为禅道迁移残留），且未被任务引用，可安全删除</div>
+      <table style="width:100%;font-size:13px">
+        <thead><tr style="background:var(--bg)"><th style="text-align:left;padding:4px 8px">名称</th><th style="text-align:left;padding:4px 8px">起止日期</th><th style="width:80px">操作</th></tr></thead>
+        <tbody>
+          ${orphans.map(p => `<tr style="border-bottom:1px solid var(--border)">
+            <td style="padding:4px 8px">${esc(p.name)}</td>
+            <td style="padding:4px 8px;color:var(--muted);font-size:12px">${p.begin_date && p.end_date ? `${esc(p.begin_date)} ~ ${esc(p.end_date)}` : (p.begin_date ? `${esc(p.begin_date)} ~ —` : '<span style="color:var(--danger)">未设置</span>')}</td>
+            <td style="padding:4px 8px"><button class="btn btn-sm" style="color:var(--danger)" onclick="deletePPProject(${p.id})">删除</button></td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>`;
+}
+
+async function deleteAllOrphanProjects() {
+  const orphans = zentaoProjectsCache.filter(p => !p.product_id);
+  if (!orphans.length) return;
+  if (!confirm(`确认删除全部 ${orphans.length} 个僵尸项目？此操作不可撤销`)) return;
+  let ok = 0, fail = 0;
+  for (const p of orphans) {
+    try {
+      await api(`/api/projects/${p.id}`, { method: 'DELETE' });
+      ok++;
+    } catch (e) { fail++; console.error(p.id, e.message); }
+  }
+  toast(`已删除 ${ok} 个僵尸项目${fail ? `，失败 ${fail} 个` : ''}`);
+  await loadPPPage();
 }
 
 let ppEditProductId = null;

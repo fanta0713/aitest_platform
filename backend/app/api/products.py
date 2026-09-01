@@ -155,9 +155,9 @@ async def delete_project(pid: int, user: User = Depends(require_admin), db: Asyn
     p = result.scalar_one_or_none()
     if not p:
         raise HTTPException(status_code=404, detail="项目不存在")
-    # 检查是否有关联测试任务
+    # 检查是否有关联测试任务（只统计未软删除的任务）
     task_cnt = (await db.execute(
-        select(func.count(TestTask.id)).where(TestTask.project_id == pid)
+        select(func.count(TestTask.id)).where(TestTask.project_id == pid, TestTask.deleted == False)
     )).scalar()
     if task_cnt > 0:
         raise HTTPException(status_code=400, detail=f"该项目下还有 {task_cnt} 个测试任务，无法删除。请先删除或迁移任务。")

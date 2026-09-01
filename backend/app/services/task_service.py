@@ -125,7 +125,7 @@ class TaskService:
             6: task_data.version_owner,   # 测试用例分配
             7: task_data.executor_id,     # 执行测试（合并原"问题记录"功能）
             8: task_data.version_owner,   # 测试完成（报告整理/log链接/自动化结果）—— 归版本负责人
-            9: task_data.version_owner,   # 数据审核
+            9: None,                       # 数据审核（PL + TSE 双审核，assigned_to=None 让两人都能操作）
             10: task_data.owner,           # 任务结束
         }
         
@@ -232,12 +232,27 @@ class TaskService:
         if not step:
             return None
 
-        # 权限校验：只有步骤 assignee 或 全员环节(assigned_to is None 或 step==8) 才能操作
+        # 权限校验：只有步骤 assignee 或 全员环节(assigned_to is None) 才能操作
         # admin 不再自动获得业务环节操作权；如需介入业务环节，需先把自己指派为该环节负责人
-        # 环节8(问题记录)全员可操作；assigned_to为None的环节(7/9执行)全员可操作
-        is_all_hands = (step.step == 8) or (step.assigned_to is None)
+        # assigned_to为None的环节(如步骤9数据审核的PL+TSE双审核)全员可操作
+        # 步骤7（执行测试）特殊：executor_id 和 executors 列表中的用户都可操作
+        is_all_hands = (step.assigned_to is None)
         is_assignee = (step.assigned_to == user_id)
-        if not is_all_hands and not is_assignee:
+        is_step7_executor = False
+        if step.step == 7:
+            task_stmt = select(TestTask).where(TestTask.id == step.task_id)
+            task_result = await self.db.execute(task_stmt)
+            task = task_result.scalar_one_or_none()
+            if task:
+                executor_ids = set()
+                if task.executor_id:
+                    executor_ids.add(task.executor_id)
+                if task.executors:
+                    for e in task.executors:
+                        if isinstance(e, dict) and e.get('user_id'):
+                            executor_ids.add(int(e['user_id']))
+                is_step7_executor = user_id in executor_ids
+        if not is_all_hands and not is_assignee and not is_step7_executor:
             raise PermissionError(f"无权操作环节{step.step}「{step.step_name}」，该环节负责人为他人")
 
         # 保存准出条件数据（单独更新或随状态一起）
@@ -270,23 +285,14 @@ class TaskService:
             await self._reset_step(step.task_id, 4)
             await self._reset_step(step.task_id, 5)
 
-        # 业务规则：环节9(数据审核)不通过需补测 → 环节5~8全部退回，
-        # 且环节5处理人从PL改为版本负责人（由版本负责人牵头补测）
+        # 业务规则：环节9(数据审核)不通过需补测 → 只退回环节8(测试完成)，
+        # 由版本负责人组织补测后重新提交，再回到环节9审核
         if step.step == 9 and data.status == "rejected":
             task_stmt = select(TestTask).where(TestTask.id == step.task_id)
             task_result = await self.db.execute(task_stmt)
             task = task_result.scalar_one_or_none()
-            for s in range(5, 9):
-                await self._reset_step(step.task_id, s)
-            if task and task.version_owner:
-                stmt5 = select(TaskStep).where(
-                    TaskStep.task_id == step.task_id, TaskStep.step == 5
-                )
-                r5 = await self.db.execute(stmt5)
-                step5 = r5.scalar_one_or_none()
-                if step5:
-                    step5.assigned_to = task.version_owner
-            # 步骤9 自己也要重置（让审核人重新审核）
+            # 只重置环节8（测试完成），环节9自己也重置让审核人重新审核
+            await self._reset_step(step.task_id, 8)
             await self._reset_step(step.task_id, 9)
 
         await self._update_task_progress(step.task_id)

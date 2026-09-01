@@ -67,6 +67,7 @@ class TaskResponse(BaseModel):
     progress: int
     current_step: int
     current_step_assignee: Optional[int] = None
+    current_step_assignee_name: Optional[str] = None  # 当前环节负责人姓名（从 task_steps + users 查）
     current_step_name: Optional[str] = None  # 当前环节名称（从 task_steps 查，避免流程改造后错位）
     description: Optional[str]
     created_at: datetime

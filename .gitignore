@@ -103,8 +103,25 @@ test_task_docker.tar
 s8000_backup/
 s8000_steps_*.md
 
-# === 错误的 Windows 路径转义目录（历史遗留）===
+# === 错误的 Windows 路径转义目录 / 文件（历史遗留）===
 C:Usersz34360H3CAIWORKtest_task*
+C*Usersz34360H3CAIWORKtest_task*
+
+# === 会话临时产物（调试脚本 / 页面抓取 / 日志）===
+dbg_*.py
+probe_*.py
+repro_*.py
+check_*.py
+*.log
+/cons.html
+/done.html
+/done2.html
+/done3.html
+/execute.html
+/final.html
+/home.html
+/loginpage.html
+/step2.html
 
 # === 容器构建产物 ===
 *.tar
