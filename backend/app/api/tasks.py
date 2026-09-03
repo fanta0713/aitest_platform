@@ -7,16 +7,35 @@ from sqlalchemy import select
 from typing import List, Optional
 from app.db.database import get_db
 from app.core.security import get_current_user, _user_roles
-from app.models.models import User, Project, TaskStep
+from app.models.models import User, Project, TaskStep, TaskCaseLink
 from app.services.task_service import TaskService, IssueService
 from app.schemas.schemas import (
     TaskCreate, TaskUpdate, TaskStepUpdate,
     TaskResponse, TaskListResponse,
     StepResponse, IssueCreate, IssueUpdate, IssueResponse,
+    IssueTreeResponse,
     ActionResponse, StatsResponse
 )
 
 router = APIRouter(prefix="/api/tasks", tags=["测试任务"])
+
+
+async def _enrich_issues_with_case_title(db: AsyncSession, issues: list) -> list:
+    """为问题单列表补全关联用例标题（case_title 非持久化字段，运行期联表获取）"""
+    if not issues:
+        return []
+    link_ids = {i.case_link_id for i in issues if i.case_link_id}
+    case_map = {}
+    if link_ids:
+        res = await db.execute(select(TaskCaseLink).where(TaskCaseLink.id.in_(link_ids)))
+        for cl in res.scalars().all():
+            case_map[cl.id] = cl.case_title
+    out = []
+    for i in issues:
+        d = IssueResponse.model_validate(i)
+        d.case_title = case_map.get(i.case_link_id) if i.case_link_id else None
+        out.append(d)
+    return out
 
 
 @router.get("", response_model=TaskListResponse)
@@ -238,7 +257,7 @@ async def get_issues(
     """获取问题列表"""
     service = IssueService(db)
     issues = await service.get_issues(task_id)
-    return [IssueResponse.model_validate(i) for i in issues]
+    return await _enrich_issues_with_case_title(db, issues)
 
 
 @router.post("/{task_id}/issues", response_model=IssueResponse)
@@ -251,7 +270,7 @@ async def create_issue(
     """创建问题"""
     service = IssueService(db)
     issue = await service.create_issue(data, current_user.id, task_id)
-    return IssueResponse.model_validate(issue)
+    return (await _enrich_issues_with_case_title(db, [issue]))[0]
 
 
 @router.put("/issues/{issue_id}", response_model=IssueResponse)
@@ -266,7 +285,17 @@ async def update_issue(
     issue = await service.update_issue(issue_id, data)
     if not issue:
         raise HTTPException(status_code=404, detail="问题不存在")
-    return IssueResponse.model_validate(issue)
+    return (await _enrich_issues_with_case_title(db, [issue]))[0]
+
+
+@router.get("/issues/tree", response_model=IssueTreeResponse)
+async def get_issues_tree(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """跨任务问题单树：产品 → 项目 → 测试任务"""
+    service = IssueService(db)
+    return await service.get_issue_tree()
 
 
 @router.get("/{task_id}/actions", response_model=List[ActionResponse])

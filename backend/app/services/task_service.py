@@ -8,9 +8,14 @@ from typing import List, Optional
 from datetime import datetime
 from app.models.models import (
     TestTask, TaskStep, TaskIssue, TaskAction,
-    TaskStatus, StepStatus, IssueStatus
+    TaskStatus, StepStatus, IssueStatus,
+    User, Project, Product, TaskCaseLink
 )
-from app.schemas.schemas import TaskCreate, TaskUpdate, TaskStepUpdate, IssueCreate, IssueUpdate
+from app.schemas.schemas import (
+    TaskCreate, TaskUpdate, TaskStepUpdate, IssueCreate, IssueUpdate,
+    IssueResponse, IssueTreeResponse, IssueTreeNode, IssueTreeTask,
+    IssueTreeProject, IssueTreeProduct
+)
 
 
 # 流程步骤定义（10步，去掉原"人力计算"）
@@ -443,6 +448,7 @@ class IssueService:
         """创建问题"""
         issue = TaskIssue(
             task_id=task_id or data.task_id,
+            case_link_id=data.case_link_id,
             bug_no=await self.generate_bug_no(task_id or data.task_id),
             title=data.title,
             severity=data.severity,
@@ -481,7 +487,137 @@ class IssueService:
         update_data = data.model_dump(exclude_unset=True)
         for key, value in update_data.items():
             setattr(issue, key, value)
-        
+
         await self.db.commit()
         await self.db.refresh(issue)
         return issue
+
+    async def get_issue_tree(self) -> IssueTreeResponse:
+        """按 产品→项目→测试任务 维度聚合所有问题单（仅含未删除任务）"""
+        stmt = (
+            select(TaskIssue, TestTask)
+            .join(TestTask, TaskIssue.task_id == TestTask.id)
+            .where(TestTask.deleted == False)
+            .order_by(TaskIssue.id.desc())
+        )
+        result = await self.db.execute(stmt)
+        rows = result.all()
+        if not rows:
+            return IssueTreeResponse(total=0, open_count=0, products=[])
+
+        # 收集关联ID
+        user_ids = set()
+        project_ids = set()
+        case_link_ids = set()
+        for issue, task in rows:
+            if issue.reporter:
+                user_ids.add(issue.reporter)
+            if issue.assigned_to:
+                user_ids.add(issue.assigned_to)
+            if issue.case_link_id:
+                case_link_ids.add(issue.case_link_id)
+            if task.project_id:
+                project_ids.add(task.project_id)
+
+        # 用户映射 id -> 显示名
+        user_map = {}
+        if user_ids:
+            u_res = await self.db.execute(select(User).where(User.id.in_(user_ids)))
+            for u in u_res.scalars().all():
+                user_map[u.id] = u.realname or u.account
+
+        # 项目 / 产品映射
+        project_map = {}
+        if project_ids:
+            p_res = await self.db.execute(select(Project).where(Project.id.in_(project_ids)))
+            for p in p_res.scalars().all():
+                project_map[p.id] = p
+        product_ids = {p.product_id for p in project_map.values() if p.product_id}
+        product_map = {}
+        if product_ids:
+            pr_res = await self.db.execute(select(Product).where(Product.id.in_(product_ids)))
+            for pr in pr_res.scalars().all():
+                product_map[pr.id] = pr
+
+        # 用例标题映射
+        case_map = {}
+        if case_link_ids:
+            cl_res = await self.db.execute(
+                select(TaskCaseLink).where(TaskCaseLink.id.in_(case_link_ids))
+            )
+            for cl in cl_res.scalars().all():
+                case_map[cl.id] = cl.case_title
+
+        # 构建树
+        tree = {}
+        total = 0
+        open_count = 0
+        for issue, task in rows:
+            total += 1
+            if issue.status not in ("closed", "rejected"):
+                open_count += 1
+
+            node = IssueTreeNode(
+                id=issue.id,
+                bug_no=issue.bug_no,
+                title=issue.title,
+                severity=issue.severity,
+                status=issue.status,
+                reporter=issue.reporter,
+                reporter_name=user_map.get(issue.reporter),
+                assigned_to=issue.assigned_to,
+                assigned_name=user_map.get(issue.assigned_to),
+                case_link_id=issue.case_link_id,
+                case_title=case_map.get(issue.case_link_id) if issue.case_link_id else None,
+                created_at=issue.created_at.isoformat() if issue.created_at else None,
+            )
+
+            proj = project_map.get(task.project_id) if task.project_id else None
+            if proj and proj.product_id and proj.product_id in product_map:
+                prod = product_map[proj.product_id]
+                prod_id = prod.id
+                prod_name = prod.name
+            else:
+                prod_id = None
+                prod_name = task.product_name or "未关联产品"
+
+            p = tree.setdefault(
+                ("p", prod_id, prod_name),
+                {"product_id": prod_id, "product_name": prod_name, "projects": {}},
+            )
+            proj_key = ("j", proj.id if proj else None, task.project_id)
+            proj_name = proj.name if proj else (f"项目#{task.project_id}" if task.project_id else "未关联项目")
+            j = p["projects"].setdefault(
+                proj_key,
+                {"project_id": proj.id if proj else None, "project_name": proj_name, "tasks": {}},
+            )
+            t = j["tasks"].setdefault(
+                task.id,
+                {"task_id": task.id, "task_name": task.name, "task_code": task.code, "issues": []},
+            )
+            t["issues"].append(node)
+
+        products_out = []
+        for _, pv in tree.items():
+            projects_out = []
+            for _, jv in pv["projects"].items():
+                tasks_out = []
+                for _, tv in jv["tasks"].items():
+                    tasks_out.append(IssueTreeTask(
+                        task_id=tv["task_id"],
+                        task_name=tv["task_name"],
+                        task_code=tv["task_code"],
+                        issues=tv["issues"],
+                    ))
+                projects_out.append(IssueTreeProject(
+                    project_id=jv["project_id"],
+                    project_name=jv["project_name"],
+                    tasks=tasks_out,
+                ))
+            products_out.append(IssueTreeProduct(
+                product_id=pv["product_id"],
+                product_name=pv["product_name"],
+                projects=projects_out,
+            ))
+
+        return IssueTreeResponse(total=total, open_count=open_count, products=products_out)

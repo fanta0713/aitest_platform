@@ -102,6 +102,7 @@ class StepResponse(BaseModel):
 # === 问题相关 ===
 class IssueCreate(BaseModel):
     task_id: Optional[int] = None
+    case_link_id: Optional[int] = None   # 从用例失败/阻塞提单时关联
     title: str = Field(..., min_length=1, max_length=255)
     severity: str = "normal"
     priority: str = "p3"
@@ -122,6 +123,8 @@ class IssueUpdate(BaseModel):
 class IssueResponse(BaseModel):
     id: int
     task_id: Optional[int] = None
+    case_link_id: Optional[int] = None
+    case_title: Optional[str] = None    # 关联用例标题（冗余，便于列表直接展示）
     bug_no: str
     title: str
     severity: str
@@ -131,9 +134,51 @@ class IssueResponse(BaseModel):
     assigned_to: Optional[int]
     resolution: Optional[str]
     created_at: datetime
-    
+
     class Config:
         from_attributes = True
+
+
+# === 问题单树（产品 → 项目 → 测试任务） ===
+class IssueTreeNode(BaseModel):
+    """树上的一个问题单"""
+    id: int
+    bug_no: str
+    title: str
+    severity: str
+    status: str
+    reporter: Optional[int] = None
+    reporter_name: Optional[str] = None
+    assigned_to: Optional[int] = None
+    assigned_name: Optional[str] = None
+    case_link_id: Optional[int] = None
+    case_title: Optional[str] = None
+    created_at: Optional[datetime] = None
+
+
+class IssueTreeTask(BaseModel):
+    task_id: Optional[int] = None
+    task_name: str = "未归属任务"
+    task_code: Optional[str] = None
+    issues: List[IssueTreeNode] = []
+
+
+class IssueTreeProject(BaseModel):
+    project_id: Optional[int] = None
+    project_name: str = "未归属项目"
+    tasks: List[IssueTreeTask] = []
+
+
+class IssueTreeProduct(BaseModel):
+    product_id: Optional[int] = None
+    product_name: str = "未归属产品"
+    projects: List[IssueTreeProject] = []
+
+
+class IssueTreeResponse(BaseModel):
+    total: int = 0        # 问题单总数
+    open_count: int = 0   # 未关闭数
+    products: List[IssueTreeProduct] = []
 
 
 # === 操作历史 ===

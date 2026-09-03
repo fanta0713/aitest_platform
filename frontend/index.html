@@ -345,6 +345,11 @@ tbody tr.clickable { cursor: pointer; }
 .view.active { display: block; }
 .muted { color: var(--text-sub); }
 .mt16 { margin-top: 16px; }
+.itree-row { cursor: pointer; padding: 5px 6px; border-radius: 6px; display: flex; gap: 8px; align-items: center; }
+.itree-row:hover { background: var(--border); }
+.itree-head { font-weight: 600; }
+.itree-caret { display: inline-block; width: 14px; color: var(--text-sub); }
+.itree-name { flex: 1; }
 </style>
 </head>
 <body>
@@ -397,6 +402,10 @@ tbody tr.clickable { cursor: pointer; }
       <button class="nav-item" data-view="caselib" onclick="switchView('caselib')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2z"/><path d="M22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z"/></svg>
         用例库
+      </button>
+      <button class="nav-item" data-view="issues" onclick="switchView('issues')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l9 4.5v9L12 20 3 15.5v-9z"/><path d="M3 6.5L12 11l9-4.5"/><path d="M12 11v9"/></svg>
+        问题单
       </button>
     </nav>
     <div class="user-box">
@@ -573,6 +582,22 @@ tbody tr.clickable { cursor: pointer; }
       <div id="caselibWrap"></div>
     </section>
 
+    <!-- 问题单（产品 → 项目 → 测试任务） -->
+    <section class="view" id="view-issues">
+      <div class="page-header">
+        <div><h2>问题单</h2><div class="desc">按 产品 → 项目 → 测试任务 维度聚合展示所有问题单</div></div>
+        <div style="display:flex;gap:10px;align-items:center">
+          <span class="badge" id="issueTreeTotal">共 0</span>
+          <span class="badge badge-warn" id="issueTreeOpen">未关闭 0</span>
+        </div>
+      </div>
+      <div class="card">
+        <div id="issueTree" style="padding:6px 4px">
+          <div class="muted" style="padding:12px">加载中…</div>
+        </div>
+      </div>
+    </section>
+
     <!-- 关联用例（完整页面，参考禅道） -->
     <section class="view" id="view-linkCases">
       <div class="page-header" style="flex-wrap:wrap;gap:10px">
@@ -666,6 +691,7 @@ tbody tr.clickable { cursor: pointer; }
   <div class="modal">
     <div class="modal-head"><h3>记录问题</h3><button class="modal-close" onclick="closeModal('issueModal')">×</button></div>
     <div class="modal-body">
+      <div id="issueCaseHint" style="display:none;margin-bottom:10px;padding:8px 10px;background:#fef2f2;border-left:3px solid var(--danger);border-radius:6px;font-size:12px;color:var(--danger)"></div>
       <div class="field"><label>问题标题 *</label><input id="iTitle" placeholder="简要描述问题"></div>
       <div class="form-row">
         <div class="field"><label>严重程度</label>
@@ -1091,6 +1117,7 @@ function switchView(name) {
   if (name === 'people') renderUserRoles();
   if (name === 'pp') loadPPPage();
   if (name === 'caselib') loadCaseLibs();
+  if (name === 'issues') loadIssueTree();
 }
 
 async function loadMyTasks(mode = 'pending') {
@@ -2989,12 +3016,14 @@ function renderCaseExecBody() {
   activeStepResults.forEach(s => { stepResMap[s.step_idx] = s; });
   const steps = Array.isArray(c.steps) ? c.steps : [];
   const assignedName = assignedUid ? userName(parseInt(assignedUid)) : '未分配';
+  const canSubmitBug = canEdit && (overallStatus === 'fail' || overallStatus === 'block');
   let html = `
     <div style="margin-bottom:12px;padding:10px 12px;background:var(--bg);border-radius:8px">
       <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
       <div>
         <b style="font-size:14px">${esc(c.title)}</b>
         ${overallBadge}
+        ${canSubmitBug ? `<button class="btn btn-sm btn-primary" style="margin-left:8px" onclick="openIssueFromCase(${linkId})">🐞 提交Bug</button>` : ''}
       </div>
       <div style="font-size:12px;color:var(--muted)">共 ${steps.length} 步 ｜ 分配给：<b>${esc(assignedName)}</b></div>
     </div>
@@ -3776,6 +3805,97 @@ async function loadIssues(taskId) {
     }).join('') + '</tbody></table>';
 }
 
+// ============ 问题单树（产品 → 项目 → 测试任务） ============
+async function loadIssueTree() {
+  const box = document.getElementById('issueTree');
+  try {
+    const data = await api('/api/tasks/issues/tree');
+    document.getElementById('issueTreeTotal').textContent = `共 ${data.total}`;
+    document.getElementById('issueTreeOpen').textContent = `未关闭 ${data.open_count}`;
+    box.innerHTML = renderIssueTree(data.products);
+    bindIssueTreeEvents();
+  } catch (e) {
+    box.innerHTML = `<div class="muted" style="padding:12px">加载失败：${esc(e.message)}</div>`;
+  }
+}
+
+function renderIssueTree(products) {
+  if (!products || !products.length) {
+    return '<div class="muted" style="padding:12px">暂无问题单</div>';
+  }
+  return products.map(p => {
+    const cnt = p.projects.reduce((s, pr) => s + pr.tasks.reduce((t, tk) => t + tk.issues.length, 0), 0);
+    return `<div class="itree-product">
+      <div class="itree-row itree-head" data-toggle="p-${p.product_id || 'none'}">
+        <span class="itree-caret">▸</span>
+        <span class="itree-name">📦 ${esc(p.product_name)}</span>
+        <span class="badge badge-gray">${cnt} 个问题</span>
+      </div>
+      <div class="itree-children" id="p-${p.product_id || 'none'}">
+        ${p.projects.map(pr => renderIssueTreeProject(pr)).join('')}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderIssueTreeProject(pr) {
+  return `<div class="itree-project" style="margin-left:18px">
+    <div class="itree-row itree-head" data-toggle="j-${pr.project_id || 'none'}">
+      <span class="itree-caret">▸</span>
+      <span class="itree-name">📁 ${esc(pr.project_name)}</span>
+    </div>
+    <div class="itree-children" id="j-${pr.project_id || 'none'}">
+      ${pr.tasks.map(tk => renderIssueTreeTask(tk)).join('')}
+    </div>
+  </div>`;
+}
+
+function renderIssueTreeTask(tk) {
+  return `<div class="itree-task" style="margin-left:18px">
+    <div class="itree-row itree-head" data-toggle="t-${tk.task_id}">
+      <span class="itree-caret">▸</span>
+      <span class="itree-name">🧪 ${esc(tk.task_name)}</span>
+      ${tk.task_code ? `<span class="muted" style="font-size:12px;font-family:monospace">${esc(tk.task_code)}</span>` : ''}
+      <span class="badge badge-gray">${tk.issues.length}</span>
+    </div>
+    <div class="itree-children" id="t-${tk.task_id}">
+      ${(tk.issues && tk.issues.length) ? tk.issues.map(i => renderIssueTreeNode(i)).join('') : '<div class="muted" style="padding:6px 0">该任务暂无问题单</div>'}
+    </div>
+  </div>`;
+}
+
+function renderIssueTreeNode(i) {
+  const [sevLabel, sevCls] = SEV_MAP[i.severity] || [i.severity, 'badge-gray'];
+  const statusLabel = {open:'待处理',assigned:'已指派',fixed:'已修复',verified:'已验证',closed:'已关闭',rejected:'已驳回'}[i.status] || i.status;
+  return `<div class="itree-issue" style="margin-left:18px;padding:8px 10px;border-left:2px solid var(--border);margin-bottom:6px">
+    <div style="display:flex;justify-content:space-between;gap:10px;align-items:center">
+      <div style="font-weight:600">${esc(i.title)}</div>
+      <span class="badge ${sevCls}">${sevLabel}</span>
+    </div>
+    <div class="muted" style="font-size:12px;margin-top:4px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+      <span style="font-family:monospace">${esc(i.bug_no)}</span>
+      <span class="badge badge-gray">${statusLabel}</span>
+      ${i.reporter_name ? `<span>报告人:${esc(i.reporter_name)}</span>` : ''}
+      ${i.assigned_name ? `<span>指派:${esc(i.assigned_name)}</span>` : ''}
+      ${i.case_title ? `<span>用例:${esc(i.case_title)}</span>` : ''}
+    </div>
+  </div>`;
+}
+
+function bindIssueTreeEvents() {
+  document.querySelectorAll('#issueTree [data-toggle]').forEach(row => {
+    row.onclick = () => {
+      const id = row.dataset.toggle;
+      const ch = document.getElementById(id);
+      if (!ch) return;
+      const hidden = ch.style.display === 'none';
+      ch.style.display = hidden ? 'block' : 'none';
+      const caret = row.querySelector('.itree-caret');
+      if (caret) caret.textContent = hidden ? '▾' : '▸';
+    };
+  });
+}
+
 async function loadActions(taskId) {
   let actions = [];
   try { actions = await api(`/api/tasks/${taskId}/actions`); } catch (e) {}
@@ -3939,10 +4059,36 @@ async function createTask() {
 }
 
 // ============ 问题记录 ============
+let issueCaseLinkId = null;  // 从用例失败/阻塞提单时携带的用例关联ID
+
 function openIssueModal() {
   if (!currentTask) return;
+  issueCaseLinkId = null;
+  document.getElementById('issueCaseHint').style.display = 'none';
   ['iTitle','iSteps','iDesc'].forEach(id => document.getElementById(id).value = '');
   document.getElementById('iSeverity').value = 'normal';
+  document.getElementById('issueModal').classList.add('show');
+}
+
+// 从用例执行（失败/阻塞）一键提交Bug：预填标题/步骤并关联用例
+function openIssueFromCase(linkId) {
+  const c = linkedCasesCache.find(x => x.id === linkId);
+  if (!c) { toast('用例数据不存在，请刷新页面重试', true); return; }
+  if (!currentTask) { toast('请先打开任务再提单', true); return; }
+  issueCaseLinkId = linkId;
+  const hint = document.getElementById('issueCaseHint');
+  hint.style.display = 'block';
+  hint.textContent = `关联用例：${c.title || ('#' + (c.zentao_case_id || c.id))}（提交后可在问题单树中查看来源）`;
+  const overall = (c.latest_result && c.latest_result.status) || '';
+  document.getElementById('iTitle').value = `${c.title || ('用例#' + c.id)} 执行${overall === 'fail' ? '失败' : overall === 'block' ? '阻塞' : '异常'}`;
+  // 预填复现步骤：取失败/阻塞步骤的实际情况
+  const sr = (c.latest_result && Array.isArray(c.latest_result.step_results)) ? c.latest_result.step_results : [];
+  const problemLines = sr
+    .filter(s => s.status === 'fail' || s.status === 'block')
+    .map(s => `步骤 ${s.step_idx + 1}（${s.status === 'fail' ? '失败' : '阻塞'}）：${s.actual || '（未填写原因）'}`);
+  document.getElementById('iSteps').value = problemLines.join('\n') || '';
+  document.getElementById('iDesc').value = '';
+  document.getElementById('iSeverity').value = 'serious';
   document.getElementById('issueModal').classList.add('show');
 }
 
@@ -3957,9 +4103,11 @@ async function createIssue() {
     steps: document.getElementById('iSteps').value.trim() || null,
     description: document.getElementById('iDesc').value.trim() || null,
   };
+  if (issueCaseLinkId) body.case_link_id = issueCaseLinkId;
   try {
     await api(`/api/tasks/${currentTask.id}/issues`, { method: 'POST', body });
-    toast('问题已记录');
+    toast('问题已记录' + (issueCaseLinkId ? '（已关联用例）' : ''));
+    issueCaseLinkId = null;
     closeModal('issueModal');
     loadIssues(currentTask.id);
   } catch (e) { toast(e.message, true); }
