@@ -752,6 +752,9 @@ tbody tr.clickable { cursor: pointer; }
     </div>
   </div>
 
+<!-- 问题单状态修改下拉菜单 -->
+<div id="issueStatusMenu" style="display:none;position:fixed;z-index:400;background:#fff;border:1px solid var(--border);border-radius:8px;box-shadow:0 8px 28px rgba(15,23,42,.18);min-width:148px;padding:4px"></div>
+
 <!-- 添加成员弹窗 -->
 <div class="modal-mask" id="memberModal">
   <div class="modal" style="width:420px">
@@ -3982,7 +3985,12 @@ function backToIssueProducts() { issueNavLevel = 'products'; issueNavProductId =
 function backToIssueProjects() { issueNavLevel = 'projects'; issueNavProjectId = issueNavTaskId = null; renderIssueNav(); }
 function backToIssueTasks() { issueNavLevel = 'tasks'; issueNavTaskId = null; renderIssueNav(); }
 
-const ISSUE_STATUS_LABEL = {open:'待处理',assigned:'已指派',fixed:'已修复',verified:'已验证',closed:'已关闭',rejected:'已驳回'};
+const ISSUE_STATUS_LABEL = {open:'待处理',assigned:'已指派',fixed:'已解决',verified:'已验证',closed:'已关闭',rejected:'已驳回'};
+const ISSUE_STATUS_ORDER = ['open','assigned','fixed','verified','closed','rejected'];
+function issueStatusBadge(status) {
+  const map = {open:'badge-blue',assigned:'badge-violet',fixed:'badge-green',verified:'badge-cyan',closed:'badge-gray',rejected:'badge-red'};
+  return map[status] || 'badge-gray';
+}
 
 function renderIssueList() {
   const prod = (issueTreeCache.products || []).find(p => String(p.product_id) === String(issueNavProductId));
@@ -3999,8 +4007,61 @@ function renderIssueList() {
       <td>${i.case_link_id ? `<span style="font-family:monospace">#${i.case_link_id}</span>${i.case_title ? ` <span class="muted" style="font-size:12px">${esc(i.case_title)}</span>` : ''}` : '<span class="muted">—</span>'}</td>
       <td>${esc(i.reporter_name || '—')}</td>
       <td class="muted" style="font-size:12px">${(i.created_at || '').slice(0, 10)}</td>
-      <td><span class="badge badge-gray">${ISSUE_STATUS_LABEL[i.status] || i.status}</span></td>
+      <td><span class="badge ${issueStatusBadge(i.status)}" style="cursor:pointer" title="点击修改状态" onclick="openIssueStatusMenu(${i.id}, this, '${i.status}')">${ISSUE_STATUS_LABEL[i.status] || i.status}</span></td>
     </tr>`).join('');
+}
+
+// ============ 问题单状态修改 ============
+function openIssueStatusMenu(issueId, el, currentStatus) {
+  const menu = document.getElementById('issueStatusMenu');
+  menu.innerHTML = ISSUE_STATUS_ORDER.map(s =>
+    `<div onclick="updateIssueStatus(${issueId}, '${s}')" style="padding:8px 12px;cursor:pointer;border-radius:6px;font-size:13px;display:flex;justify-content:space-between;gap:14px;${s === currentStatus ? 'background:#eff6ff;color:#2563eb;font-weight:600' : ''}" onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background='${s === currentStatus ? '#eff6ff' : 'transparent'}'">${ISSUE_STATUS_LABEL[s] || s}${s === currentStatus ? ' ✓' : ''}</div>`
+  ).join('');
+  const r = el.getBoundingClientRect();
+  // 先显示以测量高度，再决定向下还是向上展开，避免溢出视口
+  menu.style.visibility = 'hidden';
+  menu.style.display = 'block';
+  const mh = menu.offsetHeight;
+  let top = r.bottom + 4;
+  if (top + mh > window.innerHeight - 8) top = Math.max(8, r.top - mh - 4);
+  menu.style.left = Math.min(r.left, window.innerWidth - 170) + 'px';
+  menu.style.top = top + 'px';
+  menu.style.visibility = 'visible';
+  // 延迟绑定外部点击关闭，避免本次点击立即关闭
+  setTimeout(() => document.addEventListener('click', _closeIssueMenuOutside), 0);
+}
+
+function _closeIssueMenuOutside(e) {
+  const menu = document.getElementById('issueStatusMenu');
+  if (menu && menu.style.display !== 'none' &&
+      !menu.contains(e.target) && !(e.target.closest && e.target.closest('[onclick^="openIssueStatusMenu"]'))) {
+    closeIssueStatusMenu();
+  }
+}
+
+function closeIssueStatusMenu() {
+  const menu = document.getElementById('issueStatusMenu');
+  if (menu) menu.style.display = 'none';
+  document.removeEventListener('click', _closeIssueMenuOutside);
+}
+
+async function updateIssueStatus(issueId, status) {
+  closeIssueStatusMenu();
+  try {
+    const updated = await api(`/api/tasks/issues/${issueId}`, { method: 'PUT', body: { status } });
+    // 就地更新缓存，避免下钻层级被重置
+    for (const p of (issueTreeCache.products || [])) {
+      for (const pr of (p.projects || [])) {
+        for (const t of (pr.tasks || [])) {
+          const list = t.issues || [];
+          const idx = list.findIndex(i => i.id === issueId);
+          if (idx >= 0) { list[idx].status = status; break; }
+        }
+      }
+    }
+    renderIssueList();
+    toast(`状态已更新为「${ISSUE_STATUS_LABEL[status] || status}」`);
+  } catch (e) { toast(e.message, true); }
 }
 
 async function loadActions(taskId) {
