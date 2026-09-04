@@ -2599,6 +2599,80 @@ async function deleteCase(caseId) {
 let linkedCasesCache = [];
 
 // ============ 步骤6: 测试用例分配 ============
+// ============ 关联用例「按模块层级」展示子系统 ============
+// 折叠状态：key=模块节点 uid，值为 true 表示折叠（缺省=展开）
+let caseModuleExpandState = {};
+
+// 将用例按 module_path 聚合成树；每个节点分配稳定 uid 供折叠/展开使用
+function buildCaseModuleTree(cases) {
+  const root = { name: '__root__', path: [], children: {}, cases: [], uid: 0 };
+  let uidSeq = 1;
+  function ensureNode(parent, p) {
+    if (!parent.children[p]) {
+      parent.children[p] = { name: p, path: parent.path.concat(p), children: {}, cases: [], uid: uidSeq++ };
+    }
+    return parent.children[p];
+  }
+  cases.forEach(c => {
+    const path = (Array.isArray(c.module_path) && c.module_path.length) ? c.module_path : ['（未分类）'];
+    let node = root;
+    path.forEach(p => { node = ensureNode(node, p); });
+    node.cases.push(c);
+  });
+  return root;
+}
+
+function countModuleDescendantCases(node) {
+  let n = node.cases.length;
+  Object.values(node.children).forEach(ch => { n += countModuleDescendantCases(ch); });
+  return n;
+}
+
+function isCaseModuleOpen(uid) { return caseModuleExpandState[uid] !== true; }
+
+// 点击模块标题或箭头切换展开/折叠（仅切换 DOM 显隐，保留未保存的表单状态）
+function toggleCaseModule(uid) {
+  if (caseModuleExpandState[uid] === true) delete caseModuleExpandState[uid];
+  else caseModuleExpandState[uid] = true;
+  const body = document.getElementById('cmod_body_' + uid);
+  if (body) body.style.display = isCaseModuleOpen(uid) ? 'block' : 'none';
+}
+
+// 渲染模块树：renderCaseRow(c, seq) 返回单条用例行 HTML
+function renderCaseModuleTreeHtml(cases, renderCaseRow) {
+  const root = buildCaseModuleTree(cases);
+  let caseSeq = 0;
+  function renderNode(node, depth) {
+    const childModules = Object.values(node.children);
+    const rows = [];
+    childModules.forEach(child => {
+      const uid = child.uid;
+      const open = isCaseModuleOpen(uid);
+      const caseCnt = countModuleDescendantCases(child);
+      const hasSub = Object.keys(child.children).length > 0;
+      const hasCases = child.cases.length > 0;
+      const toggle = (hasSub || hasCases)
+        ? `<span onclick="event.stopPropagation();toggleCaseModule(${uid})" style="width:16px;flex-shrink:0;cursor:pointer;font-size:10px;color:var(--text-sub);text-align:center">${open ? '▼' : '▶'}</span>`
+        : '<span style="width:16px;flex-shrink:0"></span>';
+      rows.push(`
+        <div class="cmod-header" id="cmod_${uid}" style="display:flex;align-items:center;gap:4px;padding:6px ${depth*16+8}px;cursor:pointer;border-bottom:1px solid var(--border);${depth % 2 ? '' : 'background:rgba(0,0,0,0.012)'}" onclick="toggleCaseModule(${uid})">
+          ${toggle}
+          <span style="flex:1;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(child.name)}</span>
+          <span class="muted" style="font-size:11px;flex-shrink:0">${caseCnt} 条</span>
+        </div>`);
+      if (hasCases || hasSub) {
+        let bodyInner = '';
+        if (hasCases) bodyInner += child.cases.map(c => renderCaseRow(c, ++caseSeq)).join('');
+        if (hasSub) bodyInner += renderNode(child, depth + 1);
+        rows.push(`<div id="cmod_body_${uid}" style="display:${open ? 'block' : 'none'}">${bodyInner}</div>`);
+      }
+    });
+    return rows.join('');
+  }
+  if (!cases.length) return '<span class="muted" style="font-size:13px">暂无可展示的用例</span>';
+  return `<div class="cmod-tree">${renderNode(root, 0)}</div>`;
+}
+
 function renderCaseAssignSection(s, taskId, isCurrent, canOperate) {
   const canEdit = isCurrent && canOperate;
   return `<div class="step-cases" id="caseAssignSection_${s.id}" style="margin-top:12px">
@@ -2669,7 +2743,7 @@ async function batchAssignCases(taskId, stepId) {
     if (step) step.ext_data = merged;
     toast(`已为 ${checked.length} 条用例指派执行人并保存`);
   } catch (e) { toast('保存失败：' + e.message, true); }
-  const allCb = document.getElementById(`caseAssignAll_${stepId}`);
+  const allCb = document.getElementById(`caseAssignSelectAll_${stepId}`);
   if (allCb) { allCb.checked = false; document.querySelectorAll(`input[id^="caseAssignChk_${stepId}_"]`).forEach(c => c.checked = false); }
 }
 
@@ -2707,41 +2781,35 @@ async function loadCaseAssignments(stepId, taskId, canEdit) {
         executorUsers.map(u => `<option value="${u.id}" ${String(oldVal) === String(u.id) ? 'selected' : ''}>${esc(u.realname || u.account)}</option>`).join('');
     }
 
-    listEl.innerHTML = `
-      <table style="width:100%;border-collapse:collapse;font-size:13px">
-        <thead>
-          <tr style="background:var(--bg);border-bottom:2px solid var(--border)">
-            ${canEdit ? `<th style="padding:6px 8px;width:36px;text-align:left"><input type="checkbox" id="caseAssignThSelectAll_${stepId}" onchange="toggleCaseAssignSelectAll(${stepId}, this.checked)" style="cursor:pointer"></th>` : ''}
-            <th style="padding:6px 8px;text-align:left;width:50px">编号</th>
-            <th style="padding:6px 8px;text-align:left">用例标题</th>
-            <th style="padding:6px 8px;text-align:left;width:90px">类型</th>
-            <th style="padding:6px 8px;text-align:center;width:60px">优先级</th>
-            <th style="padding:6px 8px;text-align:left;width:150px">指派给</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${linkedCasesCache.map((c, idx) => {
-            const assignedUid = assignments[String(c.id)] || assignments[c.id] || '';
-            const opts = ['<option value="">— 未分配 —</option>']
-              .concat(executorUsers.map(u => `<option value="${u.id}" ${String(assignedUid) === String(u.id) ? 'selected' : ''}>${esc(u.realname || u.account)}</option>`))
-              .join('');
-            const typeBadge = { feature: '功能', performance: '性能', integration: '集成', regression: '回归' }[c.type] || c.type || '—';
-            const priLabel = c.priority ? `P${c.priority}` : '—';
-            return `<tr style="border-bottom:1px solid var(--border)">
-              ${canEdit ? `<td style="padding:6px 8px"><input type="checkbox" id="caseAssignChk_${stepId}_${c.id}" class="caseAssignRowChk_${stepId}" onchange="onCaseAssignCheckboxChange(${stepId})" style="cursor:pointer"></td>` : ''}
-              <td style="padding:6px 8px;color:var(--muted);font-size:12px">${idx+1}</td>
-              <td style="padding:6px 8px;max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(c.title)}">${esc(c.title)}</td>
-              <td style="padding:6px 8px"><span class="badge badge-gray">${typeBadge}</span></td>
-              <td style="padding:6px 8px;text-align:center">${priLabel}</td>
-              <td style="padding:6px 8px">
-                ${canEdit
-                  ? `<select id="caseAssign_${stepId}_${c.id}" style="width:100%;padding:3px 6px">${opts}</select>`
-                  : `<span class="muted" style="font-size:12px">${assignedUid ? esc(executorUsers.find(u => String(u.id) === String(assignedUid))?.realname || '—') : '—'}</span>`}
-              </td>
-            </tr>`;
-          }).join('')}
-        </tbody>
-      </table>`;
+    const renderAssignRow = (c) => {
+      const assignedUid = assignments[String(c.id)] || assignments[c.id] || '';
+      const opts = ['<option value="">— 未分配 —</option>']
+        .concat(executorUsers.map(u => `<option value="${u.id}" ${String(assignedUid) === String(u.id) ? 'selected' : ''}>${esc(u.realname || u.account)}</option>`))
+        .join('');
+      const typeBadge = { feature: '功能', performance: '性能', integration: '集成', regression: '回归' }[c.type] || c.type || '—';
+      const priLabel = c.priority ? `P${c.priority}` : '—';
+      return `<div style="display:flex;align-items:center;gap:8px;padding:6px 16px;border-bottom:1px solid var(--border);font-size:13px;background:#fff">
+        ${canEdit ? `<span style="width:32px;flex-shrink:0"><input type="checkbox" id="caseAssignChk_${stepId}_${c.id}" class="caseAssignRowChk_${stepId}" onchange="onCaseAssignCheckboxChange(${stepId})" style="cursor:pointer"></span>` : '<span style="width:32px;flex-shrink:0"></span>'}
+        <span style="width:46px;flex-shrink:0;color:var(--muted);font-size:12px">${c.id}</span>
+        <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(c.title)}">${esc(c.title)}</span>
+        <span style="width:90px;flex-shrink:0"><span class="badge badge-gray">${typeBadge}</span></span>
+        <span style="width:60px;text-align:center;flex-shrink:0">${priLabel}</span>
+        <span style="width:160px;flex-shrink:0">${canEdit
+          ? `<select id="caseAssign_${stepId}_${c.id}" style="width:100%;padding:3px 6px">${opts}</select>`
+          : `<span class="muted" style="font-size:12px">${assignedUid ? esc(executorUsers.find(u => String(u.id) === String(assignedUid))?.realname || '—') : '—'}</span>`}</span>
+      </div>`;
+    };
+    const header = `<div style="display:flex;gap:8px;padding:6px 16px;border-bottom:2px solid var(--border);font-size:12px;color:var(--muted);font-weight:600;background:var(--bg)">
+      <span style="width:32px;flex-shrink:0"></span>
+      <span style="width:46px;flex-shrink:0">#</span>
+      <span style="flex:1">用例标题</span>
+      <span style="width:90px;flex-shrink:0">类型</span>
+      <span style="width:60px;text-align:center;flex-shrink:0">优先级</span>
+      <span style="width:160px;flex-shrink:0">指派给</span>
+    </div>`;
+    // 按模块层级分组展示，点击模块可展开/折叠；保留 caseAssignChk_/caseAssign_ 元素 ID
+    listEl.innerHTML = header + renderCaseModuleTreeHtml(linkedCasesCache, c => renderAssignRow(c));
+    updateCaseAssignSelectedCount(stepId);
   } catch (e) {
     const listEl = document.getElementById(`caseAssignList_${stepId}`);
     if (listEl) listEl.innerHTML = `<span class="muted" style="color:var(--danger);font-size:12px">加载失败: ${esc(e.message)}</span>`;
@@ -2794,6 +2862,52 @@ function renderCaseSection(s, taskId, isCurrent, canOperate) {
   }
 }
 
+// 步骤2「关联用例」单行：序号 + 标题 + 状态 + 取消关联
+function step2CaseRow(c, seq, canEdit, taskId) {
+  const statusBadge = c.latest_result
+    ? `<span class="badge ${c.latest_result.status === 'pass' ? 'badge-green' : c.latest_result.status === 'fail' ? 'badge-red' : 'badge-amber'}" style="margin-left:6px">${{pass:'通过',fail:'失败',block:'阻塞',na:'不支持'}[c.latest_result.status]}</span>`
+    : '<span class="badge badge-gray" style="margin-left:6px">待执行</span>';
+  const delBtn = canEdit ? ` <button class="btn btn-sm" style="padding:1px 6px;font-size:11px;color:var(--danger)" onclick="unlinkCase(${taskId}, ${c.id}, '${esc(c.title).replace(/'/g,"")}')">取消关联</button>` : '';
+  return `<div style="display:flex;align-items:center;padding:6px 16px;border-bottom:1px solid var(--border);background:#fff">
+    <span style="width:34px;flex-shrink:0;color:var(--muted);font-size:12px">${seq}</span>
+    <span style="flex:1;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(c.title)}">${esc(c.title || '#' + c.zentao_case_id)}${statusBadge}</span>
+    ${delBtn}
+  </div>`;
+}
+
+// 步骤7「执行测试」单行：表格列布局（ID/标题/优先级/指派/创建/执行/时间/结果/操作）
+function step7CaseRow(c, assignments, canEdit, taskId, stepId) {
+  const assignedUid = assignments[String(c.id)] || assignments[c.id];
+  const assignedName = assignedUid ? esc(userName(parseInt(assignedUid))) : '未分配';
+  const creatorName = c.created_by ? esc(userName(c.created_by)) : '—';
+  const execUid = c.latest_result?.executor_id;
+  const execName = execUid ? esc(userName(execUid)) : '—';
+  const execTime = c.latest_result?.executed_at ? formatDateTime(c.latest_result.executed_at) : '—';
+  const status = c.latest_result?.status;
+  const statusBadge = status
+    ? `<span class="badge ${status === 'pass' ? 'badge-green' : status === 'fail' ? 'badge-red' : 'badge-amber'}" style="font-size:11px">${{pass:'通过',fail:'失败',block:'阻塞',na:'不支持'}[status]}</span>`
+    : '<span class="badge badge-gray" style="font-size:11px">待执行</span>';
+  const isMyCase = canEdit && assignedUid && parseInt(assignedUid) === currentUser.id;
+  const opLabel = isMyCase ? '▶ 执行' : '👁 查看';
+  const pri = parseInt(c.priority) || 3;
+  const priClass = p => p === 1 ? 'badge-red' : p === 2 ? 'badge-amber' : 'badge-blue';
+  return `<div style="display:flex;align-items:center;gap:8px;padding:6px 16px;border-bottom:1px solid var(--border);font-size:13px;background:#fff">
+    <span style="width:46px;flex-shrink:0;color:var(--muted);font-size:12px">${c.id}</span>
+    <span style="flex:1;min-width:0">
+      <a href="javascript:openCaseExecModal(${taskId}, ${c.id}, ${stepId}, ${canEdit ? 'true' : 'false'})" title="${esc(c.title)}" style="color:var(--primary);text-decoration:none;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(c.title || '#' + c.zentao_case_id)}</a>
+    </span>
+    <span style="width:56px;text-align:center;flex-shrink:0"><span class="badge ${priClass(pri)}" style="font-size:11px">P${pri}</span></span>
+    <span style="width:80px;flex-shrink:0;font-size:12px">${assignedName}</span>
+    <span style="width:80px;flex-shrink:0;font-size:12px;color:var(--muted)">${creatorName}</span>
+    <span style="width:80px;flex-shrink:0;font-size:12px;color:var(--muted)">${execName}</span>
+    <span style="width:120px;flex-shrink:0;font-size:12px;color:var(--muted)">${execTime}</span>
+    <span style="width:64px;text-align:center;flex-shrink:0">${statusBadge}</span>
+    <span style="width:80px;text-align:center;flex-shrink:0">
+      <button class="btn btn-sm" style="padding:2px 8px;font-size:11px;white-space:nowrap" onclick="openCaseExecModal(${taskId}, ${c.id}, ${stepId}, ${canEdit ? 'true' : 'false'})">${opLabel}</button>
+    </span>
+  </div>`;
+}
+
 async function loadLinkedCases(taskId, stepId) {
   const isStep7 = stepCache.find(s => s.id === stepId)?.step === 7;
   try {
@@ -2804,11 +2918,13 @@ async function loadLinkedCases(taskId, stepId) {
       list.innerHTML = '<span class="muted" style="font-size:13px">暂未关联测试用例</span>';
       return;
     }
-    // 更新统计
+    // 更新统计（仅 step7）
     const statsEl = document.getElementById(`caseStats_${stepId}`);
-    if (statsEl) {
-      const stats = await api(`/api/tasks/${taskId}/cases/stats`);
-      statsEl.textContent = `共${stats.total}条 | 通过${stats.passed} 失败${stats.failed} 阻塞${stats.blocked} 待执行${stats.pending} | 通过率${stats.pass_rate}%`;
+    if (statsEl && isStep7) {
+      try {
+        const stats = await api(`/api/tasks/${taskId}/cases/stats`);
+        statsEl.textContent = `共${stats.total}条 | 通过${stats.passed} 失败${stats.failed} 阻塞${stats.blocked} 待执行${stats.pending} | 通过率${stats.pass_rate}%`;
+      } catch (e) {}
     }
     // 执行测试环节(step 7)：任务 executor_id + 其他 executors + assigned_to 都能操作
     const stepObj = stepCache.find(s => s.id === stepId);
@@ -2820,71 +2936,26 @@ async function loadLinkedCases(taskId, stepId) {
       (currentTask.executors || []).some(e => e.user_id === currentUser.id)
     );
     const canEdit = isCurrent && (isAssignee || isAllHands || isTaskExecutor);
-    // step 7 执行测试环节：表格展示用例
+
     if (isStep7) {
+      // 步骤7：表头 + 按模块层级分组展示，点击模块可展开/折叠
       const step6 = stepCache.find(s => s.step === 6);
       const assignments = (step6?.ext_data?.case_assignments) || {};
-      const priClass = p => p === 1 ? 'badge-red' : p === 2 ? 'badge-amber' : 'badge-blue';
-      list.innerHTML = `
-        <table style="table-layout:fixed;width:100%;border-collapse:collapse;font-size:13px">
-          <thead>
-            <tr style="background:var(--bg);border-bottom:2px solid var(--border)">
-              <th style="padding:8px 10px;text-align:left;width:55px">ID</th>
-              <th style="padding:8px 10px;text-align:left">用例名称</th>
-              <th style="padding:8px 10px;text-align:center;width:65px">优先级</th>
-              <th style="padding:8px 10px;text-align:left;width:80px">指派给</th>
-              <th style="padding:8px 10px;text-align:left;width:80px">创建者</th>
-              <th style="padding:8px 10px;text-align:left;width:80px">执行人</th>
-              <th style="padding:8px 10px;text-align:left;width:120px">执行时间</th>
-              <th style="padding:8px 10px;text-align:center;width:65px">结果</th>
-              <th style="padding:8px 10px;text-align:center;width:85px">操作</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${linkedCasesCache.map(c => {
-              const assignedUid = assignments[String(c.id)] || assignments[c.id];
-              const assignedName = assignedUid ? esc(userName(parseInt(assignedUid))) : '未分配';
-              const creatorName = c.created_by ? esc(userName(c.created_by)) : '—';
-              const execUid = c.latest_result?.executor_id;
-              const execName = execUid ? esc(userName(execUid)) : '—';
-              const execTime = c.latest_result?.executed_at ? formatDateTime(c.latest_result.executed_at) : '—';
-              const status = c.latest_result?.status;
-              const statusBadge = status
-                ? `<span class="badge ${status === 'pass' ? 'badge-green' : status === 'fail' ? 'badge-red' : 'badge-amber'}" style="font-size:11px">${{pass:'通过',fail:'失败',block:'阻塞',na:'不支持'}[status]}</span>`
-                : '<span class="badge badge-gray" style="font-size:11px">待执行</span>';
-              const isMyCase = canEdit && assignedUid && parseInt(assignedUid) === currentUser.id;
-              const opLabel = isMyCase ? '▶ 执行' : '👁 查看';
-              const pri = parseInt(c.priority) || 3;
-              return `<tr style="border-bottom:1px solid var(--border)">
-                <td style="padding:8px 10px;color:var(--muted);font-size:12px">${c.id}</td>
-                <td style="padding:8px 10px">
-                  <a href="javascript:openCaseExecModal(${taskId}, ${c.id}, ${stepId}, ${canEdit ? 'true' : 'false'})" title="${esc(c.title)}" style="color:var(--primary);text-decoration:none;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:340px">${esc(c.title || '#' + c.zentao_case_id)}</a>
-                </td>
-                <td style="padding:8px 10px;text-align:center"><span class="badge ${priClass(pri)}" style="font-size:11px">P${pri}</span></td>
-                <td style="padding:8px 10px;font-size:12px">${assignedName}</td>
-                <td style="padding:8px 10px;font-size:12px;color:var(--muted)">${creatorName}</td>
-                <td style="padding:8px 10px;font-size:12px;color:var(--muted)">${execName}</td>
-                <td style="padding:8px 10px;font-size:12px;color:var(--muted)">${execTime}</td>
-                <td style="padding:8px 10px;text-align:center">${statusBadge}</td>
-                <td style="padding:8px 10px;text-align:center">
-                  <button class="btn btn-sm" style="padding:2px 8px;font-size:11px;white-space:nowrap" onclick="openCaseExecModal(${taskId}, ${c.id}, ${stepId}, ${canEdit ? 'true' : 'false'})">${opLabel}</button>
-                </td>
-              </tr>`;
-            }).join('')}
-          </tbody>
-        </table>`;
+      const header = `<div style="display:flex;gap:8px;padding:6px 16px;border-bottom:2px solid var(--border);font-size:12px;color:var(--muted);font-weight:600;background:var(--bg)">
+        <span style="width:46px;flex-shrink:0">ID</span>
+        <span style="flex:1">用例名称</span>
+        <span style="width:56px;text-align:center;flex-shrink:0">优先级</span>
+        <span style="width:80px;flex-shrink:0">指派给</span>
+        <span style="width:80px;flex-shrink:0">创建者</span>
+        <span style="width:80px;flex-shrink:0">执行人</span>
+        <span style="width:120px;flex-shrink:0">执行时间</span>
+        <span style="width:64px;text-align:center;flex-shrink:0">结果</span>
+        <span style="width:80px;text-align:center;flex-shrink:0">操作</span>
+      </div>`;
+      list.innerHTML = header + renderCaseModuleTreeHtml(linkedCasesCache, c => step7CaseRow(c, assignments, canEdit, taskId, stepId));
     } else {
-      // 非 step 7：旧列表渲染（关联/取消关联用例）
-      list.innerHTML = linkedCasesCache.map((c, idx) => {
-        const statusBadge = c.latest_result
-          ? `<span class="badge ${c.latest_result.status === 'pass' ? 'badge-green' : c.latest_result.status === 'fail' ? 'badge-red' : 'badge-amber'}" style="margin-left:6px">${{pass:'通过',fail:'失败',block:'阻塞',na:'不支持'}[c.latest_result.status]}</span>`
-          : '<span class="badge badge-gray" style="margin-left:6px">待执行</span>';
-        const delBtn = canEdit ? ` <button class="btn btn-sm" style="padding:1px 6px;font-size:11px;color:var(--danger)" onclick="unlinkCase(${taskId}, ${c.id}, '${esc(c.title).replace(/'/g,"")}')">取消关联</button>` : '';
-        return `<div style="display:flex;align-items:center;padding:6px 0;border-bottom:1px solid var(--border)">
-          <span style="flex:1;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(c.title)}">${idx+1}. ${esc(c.title || '#' + c.zentao_case_id)}${statusBadge}</span>
-          ${delBtn}
-        </div>`;
-      }).join('');
+      // 步骤2：按模块层级展示关联用例，支持展开/折叠，可取消关联
+      list.innerHTML = renderCaseModuleTreeHtml(linkedCasesCache, (c, seq) => step2CaseRow(c, seq, canEdit, taskId));
     }
   } catch (e) {}
 }
@@ -3985,10 +4056,10 @@ function backToIssueProducts() { issueNavLevel = 'products'; issueNavProductId =
 function backToIssueProjects() { issueNavLevel = 'projects'; issueNavProjectId = issueNavTaskId = null; renderIssueNav(); }
 function backToIssueTasks() { issueNavLevel = 'tasks'; issueNavTaskId = null; renderIssueNav(); }
 
-const ISSUE_STATUS_LABEL = {open:'待处理',assigned:'已指派',fixed:'已解决',verified:'已验证',closed:'已关闭',rejected:'已驳回'};
-const ISSUE_STATUS_ORDER = ['open','assigned','fixed','verified','closed','rejected'];
+const ISSUE_STATUS_LABEL = {open:'待处理',fixed:'已解决'};
+const ISSUE_STATUS_ORDER = ['open','fixed'];
 function issueStatusBadge(status) {
-  const map = {open:'badge-blue',assigned:'badge-violet',fixed:'badge-green',verified:'badge-cyan',closed:'badge-gray',rejected:'badge-red'};
+  const map = {open:'badge-blue',fixed:'badge-green'};
   return map[status] || 'badge-gray';
 }
 

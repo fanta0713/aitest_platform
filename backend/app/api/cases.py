@@ -10,7 +10,7 @@ from sqlalchemy.orm import selectinload
 
 from app.db.database import get_db
 from app.core.security import get_current_user
-from app.models.models import User, TestTask, TaskCaseLink, CaseResult, TestCase
+from app.models.models import User, TestTask, TaskCaseLink, CaseResult, TestCase, CaseModule
 
 router = APIRouter(prefix="/api/tasks", tags=["测试用例"])
 
@@ -43,6 +43,33 @@ async def list_linked_cases(
         for c in case_result.scalars().all():
             case_map[c.id] = c
 
+    # 拉取关联用例所属模块（含完整父链），供前端按模块层级聚合展示
+    module_map = {}
+    module_id_set = {c.module_id for c in case_map.values() if c.module_id}
+    if module_id_set:
+        to_fetch = set(module_id_set)
+        loaded_ids = set()
+        while to_fetch:
+            mod_stmt = select(CaseModule).where(CaseModule.id.in_(to_fetch))
+            mod_result = await db.execute(mod_stmt)
+            fetched = mod_result.scalars().all()
+            for m in fetched:
+                module_map[m.id] = m
+                loaded_ids.add(m.id)
+            next_parents = {
+                m.parent_id for m in fetched
+                if m.parent_id and m.parent_id not in loaded_ids
+            }
+            to_fetch = next_parents
+
+    def build_module_path(mid):
+        names = []
+        cur = module_map.get(mid)
+        while cur:
+            names.insert(0, cur.name)
+            cur = module_map.get(cur.parent_id) if cur.parent_id else None
+        return names
+
     out = []
     for link in links:
         latest = link.results[-1] if link.results else None
@@ -50,6 +77,7 @@ async def list_linked_cases(
         steps_json = []
         if case_obj and case_obj.steps:
             steps_json = case_obj.steps if isinstance(case_obj.steps, list) else []
+        module_id = case_obj.module_id if case_obj else None
         out.append({
             "id": link.id,
             "local_case_id": link.local_case_id,
@@ -60,6 +88,8 @@ async def list_linked_cases(
             "precondition": case_obj.precondition if case_obj else None,
             "steps": steps_json,
             "created_by": case_obj.created_by if case_obj else None,
+            "module_id": module_id,
+            "module_path": build_module_path(module_id) if module_id else [],
             "latest_result": ({
                 "status": latest.status,
                 "comment": latest.comment,
