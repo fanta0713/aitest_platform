@@ -2842,7 +2842,10 @@ function renderCaseSection(s, taskId, isCurrent, canOperate) {
     return `<div class="step-cases" id="caseSection_${s.id}" style="margin-top:12px">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
         <b>测试用例关联</b>
-        ${canEdit ? `<button class="btn btn-sm btn-primary" onclick="openLinkCasesPage(${taskId})">+ 关联用例</button>` : ''}
+        <span style="display:flex;gap:8px;align-items:center">
+          <button class="btn btn-sm" onclick="exportTestPlan(${taskId})">⬇ 导出测试计划表</button>
+          ${canEdit ? `<button class="btn btn-sm btn-primary" onclick="openLinkCasesPage(${taskId})">+ 关联用例</button>` : ''}
+        </span>
       </div>
       <div id="linkedCasesList_${s.id}"><span class="muted" style="font-size:13px">加载中…</span></div>
     </div>`;
@@ -2859,6 +2862,40 @@ function renderCaseSection(s, taskId, isCurrent, canOperate) {
       </div>
       <div id="linkedCasesList_${s.id}"><span class="muted" style="font-size:13px">加载中…</span></div>
     </div>`;
+  }
+}
+
+// 导出测试计划表（Sheet1 任务信息 / Sheet2 测试方案与关联用例）
+async function exportTestPlan(taskId) {
+  try {
+    toast('正在生成测试计划表…');
+    const resp = await fetch(API + '/api/tasks/' + taskId + '/export/test-plan', {
+      method: 'GET',
+      credentials: 'same-origin',
+    });
+    if (resp.status === 401) { showLogin(); throw new Error('未登录'); }
+    if (!resp.ok) {
+      let msg = '导出失败（' + resp.status + '）';
+      try { const j = await resp.json(); if (j && j.detail) msg = j.detail; } catch (e) {}
+      toast(msg, true);
+      return;
+    }
+    const blob = await resp.blob();
+    const cd = resp.headers.get('Content-Disposition') || '';
+    let fname = 'test_plan.xlsx';
+    const m = cd.match(/filename="?([^";]+)"?/);
+    if (m) fname = m[1];
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fname;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    toast('测试计划表已导出');
+  } catch (e) {
+    toast('导出失败：' + (e && e.message ? e.message : e), true);
   }
 }
 

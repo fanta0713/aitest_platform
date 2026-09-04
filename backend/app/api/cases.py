@@ -28,6 +28,11 @@ async def list_linked_cases(
     db: AsyncSession = Depends(get_db),
 ):
     """获取任务已关联的用例列表（含最新执行结果）"""
+    return await get_enriched_linked_cases(db, task_id)
+
+
+async def get_enriched_linked_cases(db: AsyncSession, task_id: int) -> list:
+    """获取任务已关联的用例列表（含模块路径与最新执行结果），供列表/导出复用"""
     stmt = select(TaskCaseLink).options(
         selectinload(TaskCaseLink.results)
     ).where(TaskCaseLink.task_id == task_id).order_by(TaskCaseLink.id)

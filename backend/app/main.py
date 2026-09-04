@@ -9,7 +9,7 @@ from contextlib import asynccontextmanager
 import os
 
 from app.db.database import init_db
-from app.api import tasks, auth, users, cases, caselib, products, files
+from app.api import tasks, auth, users, cases, caselib, products, files, export
 
 
 @asynccontextmanager
@@ -44,6 +44,7 @@ app.include_router(cases.router)
 app.include_router(caselib.router)
 app.include_router(products.router)
 app.include_router(files.router)
+app.include_router(export.router)
 
 
 # 前端静态文件
