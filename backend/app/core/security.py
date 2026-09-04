@@ -76,3 +76,14 @@ async def require_admin(user: User = Depends(get_current_user)) -> User:
     if "admin" not in _user_roles(user):
         raise HTTPException(status_code=403, detail="需要管理员权限")
     return user
+
+
+# 产品/项目管理权限：PL、TSE 或管理员可增删改，其他成员只读
+_PP_MANAGER_ROLES = {"admin", "pl", "tse"}
+
+
+async def require_pp_manager(user: User = Depends(get_current_user)) -> User:
+    """产品与项目管理权限：PL / TSE / 管理员可增删改，其他成员只读"""
+    if not _PP_MANAGER_ROLES.intersection(_user_roles(user)):
+        raise HTTPException(status_code=403, detail="仅 PL/TSE 或管理员可管理产品与项目")
+    return user

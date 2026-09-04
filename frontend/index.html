@@ -120,23 +120,43 @@ input, select, textarea { font-family: inherit; font-size: 14px; outline: none; 
 .nav-item.active { background: var(--primary); color: #fff; font-weight: 500; }
 .nav-item svg { width: 18px; height: 18px; flex-shrink: 0; }
 .sidebar .user-box {
-  padding: 14px 16px; border-top: 1px solid #1e293b;
+  position: relative; padding: 12px; border-top: 1px solid #1e293b;
 }
-.user-box-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.user-box-trigger {
+  display: flex; align-items: center; gap: 10px; padding: 8px;
+  border-radius: 10px; cursor: pointer; transition: background .15s;
+}
+.user-box-trigger:hover { background: var(--sidebar-hover); }
 .avatar {
-  width: 34px; height: 34px; border-radius: 50%; flex-shrink: 0;
+  width: 36px; height: 36px; border-radius: 50%; flex-shrink: 0;
   background: linear-gradient(135deg, #f59e0b, #d97706);
   color: #fff; display: flex; align-items: center; justify-content: center;
   font-size: 14px; font-weight: 600;
 }
 .user-box .info { flex: 1; min-width: 0; }
 .user-box .name { color: #e2e8f0; font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.user-box .role-tag { color: #64748b; font-size: 11px; }
-.logout-btn {
-  background: none; border: none; color: #64748b; font-size: 12px;
-  padding: 4px 6px; border-radius: 5px;
+.user-box .role-tag { color: #64748b; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.user-box .chev { width: 16px; height: 16px; color: #64748b; flex-shrink: 0; transition: transform .2s; }
+.user-box.open .chev { transform: rotate(180deg); }
+.user-menu {
+  position: absolute; left: 12px; right: 12px; bottom: calc(100% - 4px);
+  background: #1e293b; border: 1px solid #334155; border-radius: 12px;
+  padding: 6px; box-shadow: 0 12px 32px rgba(0,0,0,.45);
+  opacity: 0; visibility: hidden; transform: translateY(6px);
+  transition: opacity .18s ease, transform .18s ease, visibility .18s;
+  z-index: 60;
 }
-.logout-btn:hover { color: #f87171; background: #1e293b; }
+.user-box.open .user-menu { opacity: 1; visibility: visible; transform: translateY(0); }
+.user-menu-item {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  padding: 9px 10px; border: none; background: none; border-radius: 8px;
+  color: #cbd5e1; font-size: 13px; cursor: pointer; text-align: left;
+}
+.user-menu-item:hover { background: #334155; color: #fff; }
+.user-menu-item svg { width: 16px; height: 16px; flex-shrink: 0; }
+.user-menu-item.danger { color: #f87171; }
+.user-menu-item.danger:hover { background: rgba(248,113,113,.14); color: #fca5a5; }
+.user-menu-divider { height: 1px; background: #334155; margin: 4px 6px; }
 
 .main { margin-left: 220px; padding: 24px 28px; }
 .page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
@@ -391,33 +411,43 @@ tbody tr.clickable { cursor: pointer; }
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 7L9 18l-5-5"/></svg>
         我的任务
       </button>
-      <button class="nav-item" data-view="people" onclick="switchView('people')">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
-        人员与角色
-      </button>
       <button class="nav-item" data-view="pp" onclick="switchView('pp')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 7l-8-4-8 4 8 4z"/><path d="M4 7v6l8 4 8-4V7"/><path d="M12 11v10"/></svg>
         产品与项目
-      </button>
-      <button class="nav-item" data-view="caselib" onclick="switchView('caselib')">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2z"/><path d="M22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z"/></svg>
-        用例库
       </button>
       <button class="nav-item" data-view="issues" onclick="switchView('issues')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l9 4.5v9L12 20 3 15.5v-9z"/><path d="M3 6.5L12 11l9-4.5"/><path d="M12 11v9"/></svg>
         问题单
       </button>
+      <button class="nav-item" data-view="caselib" onclick="switchView('caselib')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2z"/><path d="M22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z"/></svg>
+        用例库
+      </button>
+      <button class="nav-item" data-view="people" onclick="switchView('people')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
+        人员与角色
+      </button>
     </nav>
-    <div class="user-box">
-      <div class="user-box-row">
+    <div class="user-box" id="userBox">
+      <div class="user-box-trigger" onclick="toggleUserMenu(event)">
         <div class="avatar" id="userAvatar">?</div>
         <div class="info">
           <div class="name" id="userName">—</div>
           <div class="role-tag" id="userRoleTag">—</div>
         </div>
+        <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
       </div>
-      <button class="btn btn-sm" style="width:100%;margin-bottom:6px;font-size:12px" onclick="openChangePwdModal()">修改密码</button>
-      <button class="logout-btn" onclick="doLogout()">退出</button>
+      <div class="user-menu" id="userMenu">
+        <button class="user-menu-item" onclick="closeUserMenu();openChangePwdModal()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+          修改密码
+        </button>
+        <div class="user-menu-divider"></div>
+        <button class="user-menu-item danger" onclick="closeUserMenu();doLogout()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
+          退出登录
+        </button>
+      </div>
     </div>
   </aside>
 
@@ -547,20 +577,20 @@ tbody tr.clickable { cursor: pointer; }
     <!-- 产品与项目 -->
     <section class="view" id="view-pp">
       <div class="page-header">
-        <div><h2>产品与项目</h2><div class="desc">点击左侧产品查看对应项目</div></div>
+        <div><h2>产品与项目</h2><div class="desc" id="ppDesc">点击左侧产品查看对应项目</div></div>
       </div>
       <div style="display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap">
         <div class="card" style="width:320px;flex-shrink:0">
           <div class="card-head" style="display:flex;justify-content:space-between;align-items:center">
             <h3>产品</h3>
-            <button class="btn btn-sm btn-primary" onclick="openProductModal(null)">+ 新建</button>
+            <span class="pp-manage-only"><button class="btn btn-sm btn-primary" onclick="openProductModal(null)">+ 新建</button></span>
           </div>
           <div id="ppProductList" style="max-height:500px;overflow-y:auto"></div>
         </div>
         <div class="card" style="flex:1;min-width:400px">
           <div class="card-head" style="display:flex;justify-content:space-between;align-items:center">
             <h3 id="ppProjectTitle">项目</h3>
-            <button class="btn btn-sm btn-primary" onclick="openProjectModal(null)">+ 新建项目</button>
+            <span class="pp-manage-only"><button class="btn btn-sm btn-primary" onclick="openProjectModal(null)">+ 新建项目</button></span>
           </div>
           <table id="ppProjectTable">
             <thead><tr><th>名称</th><th>代号</th><th>起止日期</th><th style="width:120px">操作</th></tr></thead>
@@ -663,14 +693,14 @@ tbody tr.clickable { cursor: pointer; }
           <label>待测产品</label>
           <div style="display:flex;gap:8px">
             <select id="cProduct" style="flex:1" onchange="onProductChange()"></select>
-            <button type="button" class="btn btn-sm" onclick="openProductCreateModal()">+ 新建产品</button>
+            <span class="pp-manage-only"><button type="button" class="btn btn-sm" onclick="openProductCreateModal()">+ 新建产品</button></span>
           </div>
         </div>
         <div class="field">
           <label>所属项目</label>
           <div style="display:flex;gap:8px">
             <select id="cProject" style="flex:1" onchange="onProjectChange()"></select>
-            <button type="button" class="btn btn-sm" onclick="openProjectCreateModal()">+ 新建项目</button>
+            <span class="pp-manage-only"><button type="button" class="btn btn-sm" onclick="openProjectCreateModal()">+ 新建项目</button></span>
           </div>
         </div>
       </div>
@@ -1138,7 +1168,24 @@ function renderUser() {
   // 创建任务按钮：仅PL/TSE/管理员可见
   const showCreate = canManageTasks();
   ['dashCreateBtn','taskCreateBtn'].forEach(id => { const el = document.getElementById(id); if (el) el.style.display = showCreate ? '' : 'none'; });
+  // 产品/项目管理操作（新建/编辑/删除）：仅PL/TSE/管理员可见
+  document.querySelectorAll('.pp-manage-only').forEach(el => { el.style.display = showCreate ? '' : 'none'; });
 }
+
+// ============ 用户菜单（修改密码 / 退出） ============
+function toggleUserMenu(e) {
+  e.stopPropagation();
+  const box = document.getElementById('userBox');
+  if (box) box.classList.toggle('open');
+}
+function closeUserMenu() {
+  const box = document.getElementById('userBox');
+  if (box) box.classList.remove('open');
+}
+document.addEventListener('click', function (e) {
+  const box = document.getElementById('userBox');
+  if (box && box.classList.contains('open') && !box.contains(e.target)) closeUserMenu();
+});
 
 function renderGreeting() {
   const h = new Date().getHours();
@@ -4579,6 +4626,8 @@ async function loadPPPage() {
   if (zentaoProductsCache.length && !ppSelectedProductId) {
     ppSelectedProductId = zentaoProductsCache[0].id;
   }
+  const ppDesc = document.getElementById('ppDesc');
+  if (ppDesc) ppDesc.textContent = canManageTasks() ? '点击左侧产品查看对应项目' : '点击左侧产品查看对应项目（只读）';
   renderPPProductList();
   renderPPProjects();
 }
@@ -4600,8 +4649,8 @@ function renderPPProductList() {
       </div>
       ${p.code ? `<div class="muted" style="font-size:11px;margin-top:2px">代号: ${esc(p.code)}</div>` : ''}
       <div style="margin-top:4px;display:flex;gap:4px">
-        <button class="btn btn-sm" style="font-size:11px;padding:1px 5px" onclick="event.stopPropagation();openProductModal(${p.id})">编辑</button>
-        <button class="btn btn-sm" style="font-size:11px;padding:1px 5px;color:var(--danger)" onclick="event.stopPropagation();deletePPProduct(${p.id})">删除</button>
+        ${canManageTasks() ? `<button class="btn btn-sm" style="font-size:11px;padding:1px 5px" onclick="event.stopPropagation();openProductModal(${p.id})">编辑</button>
+        <button class="btn btn-sm" style="font-size:11px;padding:1px 5px;color:var(--danger)" onclick="event.stopPropagation();deletePPProduct(${p.id})">删除</button>` : ''}
       </div>
     </div>`;
   }).join('');
@@ -4633,8 +4682,8 @@ function renderPPProjects() {
       <td class="muted">${esc(p.code || '—')}</td>
       <td class="muted" style="font-size:12px">${p.begin_date && p.end_date ? `${esc(p.begin_date)} ~ ${esc(p.end_date)}` : (p.begin_date ? `${esc(p.begin_date)} ~ —` : '<span style="color:var(--danger)">未设置</span>')}</td>
       <td>
-        <button class="btn btn-sm" onclick="openProjectModal(${p.id})">编辑</button>
-        <button class="btn btn-sm" style="color:var(--danger)" onclick="deletePPProject(${p.id})">删除</button>
+        ${canManageTasks() ? `<button class="btn btn-sm" onclick="openProjectModal(${p.id})">编辑</button>
+        <button class="btn btn-sm" style="color:var(--danger)" onclick="deletePPProject(${p.id})">删除</button>` : '—'}
       </td>
     </tr>`).join('');
   }
@@ -4657,7 +4706,7 @@ function renderPPOrphanProjects() {
     <div style="border-top:2px dashed var(--border);padding-top:12px;margin-top:8px">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
         <b style="color:var(--danger)">⚠ 无关联产品的僵尸项目 (${orphans.length})</b>
-        <button class="btn btn-sm" style="background:#fee2e2;color:#dc2626" onclick="deleteAllOrphanProjects()">一键清理全部</button>
+        ${canManageTasks() ? `<button class="btn btn-sm" style="background:#fee2e2;color:#dc2626" onclick="deleteAllOrphanProjects()">一键清理全部</button>` : ''}
       </div>
       <div style="font-size:12px;color:var(--muted);margin-bottom:8px">这些项目没有关联到任何产品（多为禅道迁移残留），且未被任务引用，可安全删除</div>
       <table style="width:100%;font-size:13px">
@@ -4666,7 +4715,7 @@ function renderPPOrphanProjects() {
           ${orphans.map(p => `<tr style="border-bottom:1px solid var(--border)">
             <td style="padding:4px 8px">${esc(p.name)}</td>
             <td style="padding:4px 8px;color:var(--muted);font-size:12px">${p.begin_date && p.end_date ? `${esc(p.begin_date)} ~ ${esc(p.end_date)}` : (p.begin_date ? `${esc(p.begin_date)} ~ —` : '<span style="color:var(--danger)">未设置</span>')}</td>
-            <td style="padding:4px 8px"><button class="btn btn-sm" style="color:var(--danger)" onclick="deletePPProject(${p.id})">删除</button></td>
+            <td style="padding:4px 8px">${canManageTasks() ? `<button class="btn btn-sm" style="color:var(--danger)" onclick="deletePPProject(${p.id})">删除</button>` : '—'}</td>
           </tr>`).join('')}
         </tbody>
       </table>

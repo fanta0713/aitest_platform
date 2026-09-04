@@ -9,7 +9,7 @@ from sqlalchemy import select, delete as sa_delete, func
 from datetime import date
 
 from app.db.database import get_db
-from app.core.security import get_current_user, require_admin
+from app.core.security import get_current_user, require_admin, require_pp_manager
 from app.models.models import User, Product, Project, TestTask
 
 router = APIRouter(prefix="/api", tags=["产品与项目"])
@@ -47,7 +47,7 @@ async def list_products(user: User = Depends(get_current_user), db: AsyncSession
 
 
 @router.post("/products")
-async def create_product(data: ProductCreateReq, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+async def create_product(data: ProductCreateReq, user: User = Depends(require_pp_manager), db: AsyncSession = Depends(get_db)):
     p = Product(name=data.name, code=data.code or None, description=data.description or None)
     db.add(p)
     await db.commit()
@@ -56,7 +56,7 @@ async def create_product(data: ProductCreateReq, user: User = Depends(get_curren
 
 
 @router.put("/products/{pid}")
-async def update_product(pid: int, data: ProductCreateReq, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+async def update_product(pid: int, data: ProductCreateReq, user: User = Depends(require_pp_manager), db: AsyncSession = Depends(get_db)):
     stmt = select(Product).where(Product.id == pid)
     result = await db.execute(stmt)
     p = result.scalar_one_or_none()
@@ -70,7 +70,7 @@ async def update_product(pid: int, data: ProductCreateReq, user: User = Depends(
 
 
 @router.delete("/products/{pid}")
-async def delete_product(pid: int, user: User = Depends(require_admin), db: AsyncSession = Depends(get_db)):
+async def delete_product(pid: int, user: User = Depends(require_pp_manager), db: AsyncSession = Depends(get_db)):
     stmt = select(Product).where(Product.id == pid)
     result = await db.execute(stmt)
     p = result.scalar_one_or_none()
@@ -117,7 +117,7 @@ async def list_projects(user: User = Depends(get_current_user), db: AsyncSession
 
 
 @router.post("/projects")
-async def create_project(data: ProjectCreateReq, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+async def create_project(data: ProjectCreateReq, user: User = Depends(require_pp_manager), db: AsyncSession = Depends(get_db)):
     p = Project(
         name=data.name,
         code=data.code or None,
@@ -133,7 +133,7 @@ async def create_project(data: ProjectCreateReq, user: User = Depends(get_curren
 
 
 @router.put("/projects/{pid}")
-async def update_project(pid: int, data: ProjectCreateReq, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+async def update_project(pid: int, data: ProjectCreateReq, user: User = Depends(require_pp_manager), db: AsyncSession = Depends(get_db)):
     stmt = select(Project).where(Project.id == pid)
     result = await db.execute(stmt)
     p = result.scalar_one_or_none()
@@ -149,7 +149,7 @@ async def update_project(pid: int, data: ProjectCreateReq, user: User = Depends(
 
 
 @router.delete("/projects/{pid}")
-async def delete_project(pid: int, user: User = Depends(require_admin), db: AsyncSession = Depends(get_db)):
+async def delete_project(pid: int, user: User = Depends(require_pp_manager), db: AsyncSession = Depends(get_db)):
     stmt = select(Project).where(Project.id == pid)
     result = await db.execute(stmt)
     p = result.scalar_one_or_none()
