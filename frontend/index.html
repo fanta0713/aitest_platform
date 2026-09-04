@@ -4036,7 +4036,11 @@ async function openCreateModal() {
   fillProjectSelect(defaultProdId);
   document.getElementById('createModal').classList.add('show');
 }
-function closeModal(id) { document.getElementById(id).classList.remove('show'); }
+function closeModal(id) {
+  const el = document.getElementById(id);
+  el.classList.remove('show');
+  el.style.zIndex = '';  // 还原内联层级，避免下次被其他弹窗盖住
+}
 
 function addExecutorRow() {
   const rowId = executorSeq++;
@@ -4188,6 +4192,8 @@ function openIssueFromCase(linkId) {
   hint.textContent = `关联用例：${c.title || ('#' + (c.zentao_case_id || c.id))}（提交后可在问题单列表中查看来源）`;
   document.getElementById('iNo').value = '';
   document.getElementById('iNoRemark').value = '';
+  // 该弹窗从用例执行弹窗内触发，提升层级确保在执行弹窗之上
+  document.getElementById('issueNoModal').style.zIndex = '260';
   document.getElementById('issueNoModal').classList.add('show');
 }
 
