@@ -103,7 +103,8 @@ class StepResponse(BaseModel):
 class IssueCreate(BaseModel):
     task_id: Optional[int] = None
     case_link_id: Optional[int] = None   # 从用例失败/阻塞提单时关联
-    title: str = Field(..., min_length=1, max_length=255)
+    issue_no: Optional[str] = None       # 外部缺陷系统的问题单号（本系统只记录）
+    title: Optional[str] = Field(None, max_length=255)  # 轻量录入时可省略，由服务端兜底
     severity: str = "normal"
     priority: str = "p3"
     assigned_to: Optional[int] = None
@@ -124,6 +125,7 @@ class IssueResponse(BaseModel):
     id: int
     task_id: Optional[int] = None
     case_link_id: Optional[int] = None
+    issue_no: Optional[str] = None       # 外部问题单号
     case_title: Optional[str] = None    # 关联用例标题（冗余，便于列表直接展示）
     bug_no: str
     title: str
@@ -144,6 +146,7 @@ class IssueTreeNode(BaseModel):
     """树上的一个问题单"""
     id: int
     bug_no: str
+    issue_no: Optional[str] = None       # 外部问题单号（优先展示）
     title: str
     severity: str
     status: str
@@ -160,6 +163,10 @@ class IssueTreeTask(BaseModel):
     task_id: Optional[int] = None
     task_name: str = "未归属任务"
     task_code: Optional[str] = None
+    version: Optional[str] = None
+    status: Optional[str] = None
+    progress: int = 0
+    current_step: int = 0
     issues: List[IssueTreeNode] = []
 
 

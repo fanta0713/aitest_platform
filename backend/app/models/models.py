@@ -185,6 +185,7 @@ class TaskIssue(Base):
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     task_id = Column(Integer, ForeignKey("test_tasks.id"), nullable=False, index=True)
     case_link_id = Column(Integer, ForeignKey("task_case_links.id"), nullable=True, index=True, comment="关联用例（从用例失败/阻塞提单时记录）")
+    issue_no = Column(String(100), nullable=True, index=True, comment="问题单号（外部缺陷系统的单号，本系统只做关联记录）")
     bug_no = Column(String(50), unique=True, nullable=False, comment="问题编号")
     title = Column(String(255), nullable=False, comment="问题标题")
     severity = Column(String(20), default=Severity.normal.value, comment="严重程度")

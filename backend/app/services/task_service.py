@@ -445,12 +445,16 @@ class IssueService:
         return f"{prefix}-{seq:03d}"
     
     async def create_issue(self, data: IssueCreate, user_id: int, task_id: int = None) -> TaskIssue:
-        """创建问题"""
+        """创建问题（轻量化：外部问题单号由调用方录入，标题可省略）"""
+        title = data.title
+        if not title:
+            title = f"问题单 {data.issue_no}" if data.issue_no else "关联问题单"
         issue = TaskIssue(
             task_id=task_id or data.task_id,
             case_link_id=data.case_link_id,
+            issue_no=data.issue_no,
             bug_no=await self.generate_bug_no(task_id or data.task_id),
-            title=data.title,
+            title=title,
             severity=data.severity,
             priority=data.priority,
             assigned_to=data.assigned_to,
@@ -560,6 +564,7 @@ class IssueService:
             node = IssueTreeNode(
                 id=issue.id,
                 bug_no=issue.bug_no,
+                issue_no=issue.issue_no,
                 title=issue.title,
                 severity=issue.severity,
                 status=issue.status,
@@ -607,6 +612,10 @@ class IssueService:
                         task_id=tv["task_id"],
                         task_name=tv["task_name"],
                         task_code=tv["task_code"],
+                        version=task.version,
+                        status=task.status,
+                        progress=task.progress or 0,
+                        current_step=task.current_step or 0,
                         issues=tv["issues"],
                     ))
                 projects_out.append(IssueTreeProject(

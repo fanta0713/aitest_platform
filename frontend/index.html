@@ -582,18 +582,40 @@ tbody tr.clickable { cursor: pointer; }
       <div id="caselibWrap"></div>
     </section>
 
-    <!-- 问题单（产品 → 项目 → 测试任务） -->
+    <!-- 问题单（产品 → 项目 → 测试任务，逐层下钻，对齐测试任务视图） -->
     <section class="view" id="view-issues">
       <div class="page-header">
-        <div><h2>问题单</h2><div class="desc">按 产品 → 项目 → 测试任务 维度聚合展示所有问题单</div></div>
+        <div><h2>问题单</h2><div class="desc">按 产品 → 项目 → 测试任务 逐层下钻查看问题单</div></div>
         <div style="display:flex;gap:10px;align-items:center">
           <span class="badge" id="issueTreeTotal">共 0</span>
           <span class="badge badge-warn" id="issueTreeOpen">未关闭 0</span>
         </div>
       </div>
-      <div class="card">
-        <div id="issueTree" style="padding:6px 4px">
-          <div class="muted" style="padding:12px">加载中…</div>
+      <!-- 面包屑导航 -->
+      <div id="issueBreadcrumb" style="display:flex;align-items:center;gap:6px;margin-bottom:16px;font-size:13px;color:var(--text-sub)"></div>
+      <!-- 第一层：产品概览 -->
+      <div id="issueNavProducts" class="task-nav-grid"></div>
+      <!-- 第二层：项目概览 -->
+      <div id="issueNavProjects" style="display:none"></div>
+      <!-- 第三层：测试任务列表 -->
+      <div id="issueNavTasks" style="display:none">
+        <div class="card">
+          <table>
+            <thead><tr><th>编号</th><th>任务名称</th><th>版本</th><th>起止时间</th><th>状态</th><th>进度</th><th>当前步骤</th><th>问题单</th></tr></thead>
+            <tbody id="issueTasksBody"></tbody>
+          </table>
+          <div class="empty" id="issueTasksEmpty" style="display:none">该项目下暂无任务</div>
+        </div>
+      </div>
+      <!-- 第四层：问题单列表 -->
+      <div id="issueListWrap" style="display:none">
+        <div id="issueListContext" class="card mt16" style="padding:10px 14px;font-size:13px;color:var(--text-sub)"></div>
+        <div class="card mt16">
+          <table>
+            <thead><tr><th>问题单号</th><th>关联用例ID</th><th>提单人</th><th>提单日期</th><th>状态</th></tr></thead>
+            <tbody id="issueListBody"></tbody>
+          </table>
+          <div class="empty" id="issueListEmpty" style="display:none">该任务暂无问题单</div>
         </div>
       </div>
     </section>
@@ -707,12 +729,28 @@ tbody tr.clickable { cursor: pointer; }
       <div class="field"><label>复现步骤</label><textarea id="iSteps" rows="3" placeholder="1. ...&#10;2. ..."></textarea></div>
       <div class="field"><label>详细描述</label><textarea id="iDesc" rows="2"></textarea></div>
     </div>
-    <div class="modal-foot">
-      <button class="btn" onclick="closeModal('issueModal')">取消</button>
-      <button class="btn btn-primary" onclick="createIssue()">提交</button>
+      <div class="modal-foot">
+        <button class="btn" onclick="closeModal('issueModal')">取消</button>
+        <button class="btn btn-primary" onclick="createIssue()">提交</button>
+      </div>
     </div>
   </div>
-</div>
+
+  <!-- 从用例失败/阻塞轻量关联问题单（只记录外部单号） -->
+  <div class="modal-mask" id="issueNoModal">
+    <div class="modal" style="width:460px">
+      <div class="modal-head"><h3>关联问题单</h3><button class="modal-close" onclick="closeModal('issueNoModal')">×</button></div>
+      <div class="modal-body">
+        <div id="issueNoCaseHint" style="display:none;margin-bottom:10px;padding:8px 10px;background:#fef2f2;border-left:3px solid var(--danger);border-radius:6px;font-size:12px;color:var(--danger)"></div>
+        <div class="field"><label>问题单号 *</label><input id="iNo" placeholder="外部缺陷系统的问题单号"></div>
+        <div class="field"><label>备注</label><textarea id="iNoRemark" rows="2" placeholder="可选（如缺陷链接、简要说明）"></textarea></div>
+      </div>
+      <div class="modal-foot">
+        <button class="btn" onclick="closeModal('issueNoModal')">取消</button>
+        <button class="btn btn-primary" onclick="submitIssueNo()">保存</button>
+      </div>
+    </div>
+  </div>
 
 <!-- 添加成员弹窗 -->
 <div class="modal-mask" id="memberModal">
@@ -3805,95 +3843,164 @@ async function loadIssues(taskId) {
     }).join('') + '</tbody></table>';
 }
 
-// ============ 问题单树（产品 → 项目 → 测试任务） ============
+// ============ 问题单（产品 → 项目 → 测试任务，逐层下钻，对齐测试任务视图） ============
+let issueNavLevel = 'products';
+let issueNavProductId = null;
+let issueNavProjectId = null;
+let issueNavTaskId = null;
+let issueTreeCache = null;
+
 async function loadIssueTree() {
-  const box = document.getElementById('issueTree');
   try {
     const data = await api('/api/tasks/issues/tree');
+    issueTreeCache = data;
     document.getElementById('issueTreeTotal').textContent = `共 ${data.total}`;
     document.getElementById('issueTreeOpen').textContent = `未关闭 ${data.open_count}`;
-    box.innerHTML = renderIssueTree(data.products);
-    bindIssueTreeEvents();
+    issueNavLevel = 'products';
+    issueNavProductId = issueNavProjectId = issueNavTaskId = null;
+    renderIssueNav();
   } catch (e) {
-    box.innerHTML = `<div class="muted" style="padding:12px">加载失败：${esc(e.message)}</div>`;
+    document.getElementById('issueBreadcrumb').innerHTML = `<span class="muted">加载失败：${esc(e.message)}</span>`;
   }
 }
 
-function renderIssueTree(products) {
-  if (!products || !products.length) {
-    return '<div class="muted" style="padding:12px">暂无问题单</div>';
+function countIssuesUnderProduct(p) {
+  return (p.projects || []).reduce((s, pr) => s + (pr.tasks || []).reduce((t, tk) => t + tk.issues.length, 0), 0);
+}
+function countIssuesUnderProject(pr) {
+  return (pr.tasks || []).reduce((t, tk) => t + tk.issues.length, 0);
+}
+
+function renderIssueNav() {
+  const bc = document.getElementById('issueBreadcrumb');
+  const productsDiv = document.getElementById('issueNavProducts');
+  const projectsDiv = document.getElementById('issueNavProjects');
+  const tasksDiv = document.getElementById('issueNavTasks');
+  const listWrap = document.getElementById('issueListWrap');
+
+  if (issueNavLevel === 'products') {
+    bc.style.display = 'none';
+    productsDiv.style.display = 'grid';
+    projectsDiv.style.display = 'none';
+    tasksDiv.style.display = 'none';
+    listWrap.style.display = 'none';
+    renderIssueNavProducts();
+  } else if (issueNavLevel === 'projects') {
+    const prod = (issueTreeCache.products || []).find(p => String(p.product_id) === String(issueNavProductId));
+    bc.style.display = 'flex';
+    bc.innerHTML = `<span style="cursor:pointer;color:var(--primary)" onclick="backToIssueProducts()">产品列表</span><span>›</span><b>${esc(prod?.product_name || '—')}</b>`;
+    productsDiv.style.display = 'none';
+    projectsDiv.style.display = 'block';
+    tasksDiv.style.display = 'none';
+    listWrap.style.display = 'none';
+    renderIssueNavProjects();
+  } else if (issueNavLevel === 'tasks') {
+    const prod = (issueTreeCache.products || []).find(p => String(p.product_id) === String(issueNavProductId));
+    const proj = (prod?.projects || []).find(pr => String(pr.project_id) === String(issueNavProjectId));
+    bc.style.display = 'flex';
+    bc.innerHTML = `<span style="cursor:pointer;color:var(--primary)" onclick="backToIssueProducts()">产品列表</span><span>›</span><span style="cursor:pointer;color:var(--primary)" onclick="backToIssueProjects()">${esc(prod?.product_name || '—')}</span><span>›</span><b>${esc(proj?.project_name || '—')}</b>`;
+    productsDiv.style.display = 'none';
+    projectsDiv.style.display = 'none';
+    tasksDiv.style.display = 'block';
+    listWrap.style.display = 'none';
+    renderIssueNavTasks();
+  } else {
+    const prod = (issueTreeCache.products || []).find(p => String(p.product_id) === String(issueNavProductId));
+    const proj = (prod?.projects || []).find(pr => String(pr.project_id) === String(issueNavProjectId));
+    const task = (proj?.tasks || []).find(t => String(t.task_id) === String(issueNavTaskId));
+    bc.style.display = 'flex';
+    bc.innerHTML = `<span style="cursor:pointer;color:var(--primary)" onclick="backToIssueProducts()">产品列表</span><span>›</span><span style="cursor:pointer;color:var(--primary)" onclick="backToIssueProjects()">${esc(prod?.product_name || '—')}</span><span>›</span><span style="cursor:pointer;color:var(--primary)" onclick="backToIssueTasks()">${esc(proj?.project_name || '—')}</span><span>›</span><b>${esc(task?.task_name || '—')}</b>`;
+    productsDiv.style.display = 'none';
+    projectsDiv.style.display = 'none';
+    tasksDiv.style.display = 'none';
+    listWrap.style.display = 'block';
+    renderIssueList();
   }
-  return products.map(p => {
-    const cnt = p.projects.reduce((s, pr) => s + pr.tasks.reduce((t, tk) => t + tk.issues.length, 0), 0);
-    return `<div class="itree-product">
-      <div class="itree-row itree-head" data-toggle="p-${p.product_id || 'none'}">
-        <span class="itree-caret">▸</span>
-        <span class="itree-name">📦 ${esc(p.product_name)}</span>
-        <span class="badge badge-gray">${cnt} 个问题</span>
-      </div>
-      <div class="itree-children" id="p-${p.product_id || 'none'}">
-        ${p.projects.map(pr => renderIssueTreeProject(pr)).join('')}
-      </div>
+}
+
+function renderIssueNavProducts() {
+  const grid = document.getElementById('issueNavProducts');
+  const prods = issueTreeCache.products || [];
+  if (!prods.length) { grid.innerHTML = '<div class="empty">暂无问题单</div>'; return; }
+  grid.innerHTML = prods.map(p => {
+    const cnt = countIssuesUnderProduct(p);
+    return `<div class="task-nav-card" onclick="enterIssueProduct('${p.product_id}')">
+      <h4>${esc(p.product_name)}</h4>
+      <div class="nav-stats"><div class="nav-stat"><b>${cnt}</b><span>问题单</span></div></div>
+      <div class="nav-arrow">›</div>
     </div>`;
   }).join('');
 }
 
-function renderIssueTreeProject(pr) {
-  return `<div class="itree-project" style="margin-left:18px">
-    <div class="itree-row itree-head" data-toggle="j-${pr.project_id || 'none'}">
-      <span class="itree-caret">▸</span>
-      <span class="itree-name">📁 ${esc(pr.project_name)}</span>
-    </div>
-    <div class="itree-children" id="j-${pr.project_id || 'none'}">
-      ${pr.tasks.map(tk => renderIssueTreeTask(tk)).join('')}
-    </div>
-  </div>`;
+function enterIssueProduct(pid) { issueNavProductId = pid; issueNavLevel = 'projects'; renderIssueNav(); }
+
+function renderIssueNavProjects() {
+  const div = document.getElementById('issueNavProjects');
+  const prod = (issueTreeCache.products || []).find(p => String(p.product_id) === String(issueNavProductId));
+  const projs = prod?.projects || [];
+  if (!projs.length) { div.innerHTML = '<div class="empty">该产品下暂无项目问题单</div>'; return; }
+  div.innerHTML = `<div class="task-nav-grid">` + projs.map(pr => {
+    const cnt = countIssuesUnderProject(pr);
+    return `<div class="task-nav-card" onclick="enterIssueProject('${pr.project_id}')">
+      <h4>${esc(pr.project_name)}</h4>
+      <div class="nav-stats"><div class="nav-stat"><b>${cnt}</b><span>问题单</span></div></div>
+      <div class="nav-arrow">›</div>
+    </div>`;
+  }).join('') + `</div>`;
 }
 
-function renderIssueTreeTask(tk) {
-  return `<div class="itree-task" style="margin-left:18px">
-    <div class="itree-row itree-head" data-toggle="t-${tk.task_id}">
-      <span class="itree-caret">▸</span>
-      <span class="itree-name">🧪 ${esc(tk.task_name)}</span>
-      ${tk.task_code ? `<span class="muted" style="font-size:12px;font-family:monospace">${esc(tk.task_code)}</span>` : ''}
-      <span class="badge badge-gray">${tk.issues.length}</span>
-    </div>
-    <div class="itree-children" id="t-${tk.task_id}">
-      ${(tk.issues && tk.issues.length) ? tk.issues.map(i => renderIssueTreeNode(i)).join('') : '<div class="muted" style="padding:6px 0">该任务暂无问题单</div>'}
-    </div>
-  </div>`;
+function enterIssueProject(pid) { issueNavProjectId = pid; issueNavLevel = 'tasks'; renderIssueNav(); }
+
+function renderIssueNavTasks() {
+  const prod = (issueTreeCache.products || []).find(p => String(p.product_id) === String(issueNavProductId));
+  const proj = (prod?.projects || []).find(pr => String(pr.project_id) === String(issueNavProjectId));
+  const tasks = proj?.tasks || [];
+  const body = document.getElementById('issueTasksBody');
+  document.getElementById('issueTasksEmpty').style.display = tasks.length ? 'none' : 'block';
+  body.innerHTML = tasks.map(t => `
+    <tr class="clickable" onclick="enterIssueTask('${t.task_id}')">
+      <td style="font-family:monospace;color:var(--primary);font-weight:600;font-size:12px">${esc(t.task_code || '')}</td>
+      <td style="font-weight:500">${esc(t.task_name)}</td>
+      <td><span class="muted" style="font-size:12px">${esc(t.version || '—')}</span></td>
+      <td>${statusBadge(t.status)}</td>
+      <td style="min-width:100px">
+        <div style="display:flex;align-items:center;gap:8px">
+          <div style="flex:1;height:6px;background:#e2e8f0;border-radius:3px;overflow:hidden">
+            <div style="width:${t.progress}%;height:100%;background:var(--primary)"></div>
+          </div>
+          <span style="font-size:12px;color:var(--text-sub)">${t.progress}%</span>
+        </div>
+      </td>
+      <td><span class="badge badge-gray" style="font-size:11px">${t.current_step}. ${STEP_NAMES[t.current_step-1] || '—'}</span></td>
+      <td><b>${t.issues.length}</b></td>
+    </tr>`).join('');
 }
 
-function renderIssueTreeNode(i) {
-  const [sevLabel, sevCls] = SEV_MAP[i.severity] || [i.severity, 'badge-gray'];
-  const statusLabel = {open:'待处理',assigned:'已指派',fixed:'已修复',verified:'已验证',closed:'已关闭',rejected:'已驳回'}[i.status] || i.status;
-  return `<div class="itree-issue" style="margin-left:18px;padding:8px 10px;border-left:2px solid var(--border);margin-bottom:6px">
-    <div style="display:flex;justify-content:space-between;gap:10px;align-items:center">
-      <div style="font-weight:600">${esc(i.title)}</div>
-      <span class="badge ${sevCls}">${sevLabel}</span>
-    </div>
-    <div class="muted" style="font-size:12px;margin-top:4px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
-      <span style="font-family:monospace">${esc(i.bug_no)}</span>
-      <span class="badge badge-gray">${statusLabel}</span>
-      ${i.reporter_name ? `<span>报告人:${esc(i.reporter_name)}</span>` : ''}
-      ${i.assigned_name ? `<span>指派:${esc(i.assigned_name)}</span>` : ''}
-      ${i.case_title ? `<span>用例:${esc(i.case_title)}</span>` : ''}
-    </div>
-  </div>`;
-}
+function enterIssueTask(tid) { issueNavTaskId = tid; issueNavLevel = 'issues'; renderIssueNav(); }
 
-function bindIssueTreeEvents() {
-  document.querySelectorAll('#issueTree [data-toggle]').forEach(row => {
-    row.onclick = () => {
-      const id = row.dataset.toggle;
-      const ch = document.getElementById(id);
-      if (!ch) return;
-      const hidden = ch.style.display === 'none';
-      ch.style.display = hidden ? 'block' : 'none';
-      const caret = row.querySelector('.itree-caret');
-      if (caret) caret.textContent = hidden ? '▾' : '▸';
-    };
-  });
+function backToIssueProducts() { issueNavLevel = 'products'; issueNavProductId = issueNavProjectId = issueNavTaskId = null; renderIssueNav(); }
+function backToIssueProjects() { issueNavLevel = 'projects'; issueNavProjectId = issueNavTaskId = null; renderIssueNav(); }
+function backToIssueTasks() { issueNavLevel = 'tasks'; issueNavTaskId = null; renderIssueNav(); }
+
+const ISSUE_STATUS_LABEL = {open:'待处理',assigned:'已指派',fixed:'已修复',verified:'已验证',closed:'已关闭',rejected:'已驳回'};
+
+function renderIssueList() {
+  const prod = (issueTreeCache.products || []).find(p => String(p.product_id) === String(issueNavProductId));
+  const proj = (prod?.projects || []).find(pr => String(pr.project_id) === String(issueNavProjectId));
+  const task = (proj?.tasks || []).find(t => String(t.task_id) === String(issueNavTaskId));
+  document.getElementById('issueListContext').innerHTML =
+    `产品：<b>${esc(prod?.product_name || '—')}</b> ｜ 项目：<b>${esc(proj?.project_name || '—')}</b> ｜ 测试任务：<b>${esc(task?.task_name || '—')}</b>${task?.task_code ? ` <span class="muted" style="font-family:monospace">${esc(task.task_code)}</span>` : ''}`;
+  const issues = task?.issues || [];
+  const body = document.getElementById('issueListBody');
+  document.getElementById('issueListEmpty').style.display = issues.length ? 'none' : 'block';
+  body.innerHTML = issues.map(i => `
+    <tr>
+      <td style="font-family:monospace;font-weight:600">${esc(i.issue_no || i.bug_no)}</td>
+      <td>${i.case_link_id ? `<span style="font-family:monospace">#${i.case_link_id}</span>${i.case_title ? ` <span class="muted" style="font-size:12px">${esc(i.case_title)}</span>` : ''}` : '<span class="muted">—</span>'}</td>
+      <td>${esc(i.reporter_name || '—')}</td>
+      <td class="muted" style="font-size:12px">${(i.created_at || '').slice(0, 10)}</td>
+      <td><span class="badge badge-gray">${ISSUE_STATUS_LABEL[i.status] || i.status}</span></td>
+    </tr>`).join('');
 }
 
 async function loadActions(taskId) {
@@ -4070,34 +4177,50 @@ function openIssueModal() {
   document.getElementById('issueModal').classList.add('show');
 }
 
-// 从用例执行（失败/阻塞）一键提交Bug：预填标题/步骤并关联用例
+// 从用例执行（失败/阻塞）一键关联外部问题单：只记录单号
 function openIssueFromCase(linkId) {
   const c = linkedCasesCache.find(x => x.id === linkId);
   if (!c) { toast('用例数据不存在，请刷新页面重试', true); return; }
   if (!currentTask) { toast('请先打开任务再提单', true); return; }
   issueCaseLinkId = linkId;
-  const hint = document.getElementById('issueCaseHint');
+  const hint = document.getElementById('issueNoCaseHint');
   hint.style.display = 'block';
-  hint.textContent = `关联用例：${c.title || ('#' + (c.zentao_case_id || c.id))}（提交后可在问题单树中查看来源）`;
-  const overall = (c.latest_result && c.latest_result.status) || '';
-  document.getElementById('iTitle').value = `${c.title || ('用例#' + c.id)} 执行${overall === 'fail' ? '失败' : overall === 'block' ? '阻塞' : '异常'}`;
-  // 预填复现步骤：取失败/阻塞步骤的实际情况
-  const sr = (c.latest_result && Array.isArray(c.latest_result.step_results)) ? c.latest_result.step_results : [];
-  const problemLines = sr
-    .filter(s => s.status === 'fail' || s.status === 'block')
-    .map(s => `步骤 ${s.step_idx + 1}（${s.status === 'fail' ? '失败' : '阻塞'}）：${s.actual || '（未填写原因）'}`);
-  document.getElementById('iSteps').value = problemLines.join('\n') || '';
-  document.getElementById('iDesc').value = '';
-  document.getElementById('iSeverity').value = 'serious';
-  document.getElementById('issueModal').classList.add('show');
+  hint.textContent = `关联用例：${c.title || ('#' + (c.zentao_case_id || c.id))}（提交后可在问题单列表中查看来源）`;
+  document.getElementById('iNo').value = '';
+  document.getElementById('iNoRemark').value = '';
+  document.getElementById('issueNoModal').classList.add('show');
+}
+
+// 轻量保存：仅记录外部缺陷系统的问题单号
+async function submitIssueNo() {
+  const issueNo = document.getElementById('iNo').value.trim();
+  if (!issueNo) { toast('请填写问题单号', true); return; }
+  if (!currentTask) { toast('请先打开任务再提单', true); return; }
+  const body = {
+    task_id: currentTask.id,
+    issue_no: issueNo,
+    case_link_id: issueCaseLinkId || undefined,
+  };
+  const remark = document.getElementById('iNoRemark').value.trim();
+  if (remark) body.title = remark;
+  try {
+    await api(`/api/tasks/${currentTask.id}/issues`, { method: 'POST', body });
+    toast('问题单已关联（单号 ' + issueNo + '）');
+    issueCaseLinkId = null;
+    closeModal('issueNoModal');
+    // 若问题单视图已展开到该任务，刷新列表；否则跳过避免误切换
+    if (window.location.hash === '#issues' || (typeof issueNavTaskId !== 'undefined' && issueNavTaskId === currentTask.id)) {
+      loadIssueTree();
+    }
+  } catch (e) { toast(e.message, true); }
 }
 
 async function createIssue() {
   const title = document.getElementById('iTitle').value.trim();
-  if (!title) { toast('请填写问题标题', true); return; }
   const body = {
     task_id: currentTask.id,
-    title,
+    // title 可选：后端会自动生成占位标题（仅记录单号时空 title 也可）
+    title: title || null,
     severity: document.getElementById('iSeverity').value,
     assigned_to: document.getElementById('iAssignee').value ? parseInt(document.getElementById('iAssignee').value) : null,
     steps: document.getElementById('iSteps').value.trim() || null,
