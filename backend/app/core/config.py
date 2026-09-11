@@ -7,12 +7,6 @@ from functools import lru_cache
 
 
 class Settings(BaseSettings):
-    # 禅道配置
-    zentao_url: str = "http://192.2.100.30:8000"
-    zentao_token: str = ""
-    zentao_admin_account: str = "admin"
-    zentao_admin_password: str = ""
-
     # JWT密钥
     secret_key: str = "change-me-in-production"
 
