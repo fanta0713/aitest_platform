@@ -81,16 +81,37 @@ bash /opt/testtask/ops/restore.sh /opt/testtask/backups/xxx.sql
 
 ---
 
-## 五、当前已知隐患（建议排一次窗口修掉）
+## 五、已知隐患（2026-09-11 已全部修复）
 
-1. **`/app/uploads` 没挂载** —— 现在附件在容器可写层，重建容器就丢；也导致**无法做双实例/蓝绿**（两个实例各存各的附件）。
-   修法：`docker-compose.yml` 的 testtask-backend 加 `- ./backend/uploads:/app/uploads`，重建容器（会中断约 1 分钟，需窗口）。
-2. **后端没有 healthcheck** —— 现在 db 有、backend 没有；加了之后 `docker restart` 能自动判断就绪，配合 `restart: unless-stopped` 更稳。
-3. **Git 仓库不是完整副本**（缺 `auth.py / users.py / caselib.py / suites.py`）—— 真要恢复只能靠容器/宿主源码。建议补齐后提交，作为最后一道防线。
+1. ~~**`/app/uploads` 没挂载**~~ → **已修**：compose 加了 `- ./backend/uploads:/app/uploads`。
+   附件已迁到宿主 `/opt/testtask/backend/uploads`（31 个文件，迁移前先 `docker cp` 导出，避免空目录覆盖丢失）。
+   现在重建容器附件不丢，也具备做双实例/蓝绿的条件。
+2. ~~**后端没有 healthcheck**~~ → **已修**：加了 30s 间隔探测 `/docs`，`docker ps` 现在显示 healthy。
+3. ~~**Git 仓库不是完整副本**~~ → **已修**：补齐 `auth.py / users.py / caselib.py / suites.py / __init__.py / zentao.py`
+   及 `models|schemas|services` 的 `__init__.py`，已提交并推送（commit `f3130d7`）。
+
+## 六、⚠️ 重建容器前必做：先同步宿主源码
+
+**血泪教训**：我们的后端改动一直是用 `docker cp` 直接灌进容器的，**不在镜像里，也不在宿主 `/opt/testtask/backend`**。
+所以：
+
+- 如果直接 `docker compose up -d`（不 build）→ 新容器从旧镜像起，**所有改动全部丢失**；
+- 如果直接 `docker compose up -d --build` → 用**陈旧的宿主源码**构建，同样回退到旧代码（2026-09-11 实测宿主有 3 个文件是旧的：
+  `caselib.py / schemas.py / task_service.py`）。
+
+**正确顺序**：
+```bash
+docker exec testtask-backend tar czf /tmp/app.tgz -C /app app
+docker cp testtask-backend:/tmp/app.tgz /tmp/app.tgz
+cd /opt/testtask/backend && tar xzf /tmp/app.tgz     # 用容器源码反盖宿主
+# 确认关键改动还在（例：grep _delete_cases_cascade app/api/caselib.py）
+docker compose up -d --build
+```
+建议以后**每次 docker cp 之后都顺手同步一次宿主**，或干脆改成"改宿主 → build → 重建容器"的标准流程。
 
 ---
 
-## 六、日常改动最小清单（贴墙版）
+## 七、日常改动最小清单（贴墙版）
 
 - [ ] 改前：`ops/backup.sh`（DB）+ 前端自动备份
 - [ ] 前端：`node --check` 抽取 `<script>` 校验
