@@ -423,6 +423,10 @@ tbody tr.clickable { cursor: pointer; }
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2z"/><path d="M22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z"/></svg>
         用例库
       </button>
+      <button class="nav-item" data-view="suite" onclick="switchView('suite')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/><path d="M3.27 6.96L12 12.01l8.73-5.05"/><path d="M12 22.08V12"/></svg>
+        用例套件
+      </button>
       <button class="nav-item" data-view="people" onclick="switchView('people')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
         人员与角色
@@ -467,7 +471,7 @@ tbody tr.clickable { cursor: pointer; }
       <div class="card">
         <div class="card-head"><h3>最近任务</h3><button class="btn btn-sm" onclick="switchView('tasks')">查看全部</button></div>
         <table>
-          <thead><tr><th>编号</th><th>任务名称</th><th>版本</th><th>状态</th><th>进度</th><th>当前步骤</th></tr></thead>
+          <thead><tr><th>编号</th><th>任务名称</th><th>版本</th><th>进度</th><th>当前步骤</th><th>当前步骤负责人</th></tr></thead>
           <tbody id="recentTasksBody"></tbody>
         </table>
       </div>
@@ -492,7 +496,7 @@ tbody tr.clickable { cursor: pointer; }
       <div id="taskNavTasks" style="display:none">
         <div class="card">
           <table>
-            <thead><tr><th>编号</th><th>任务名称</th><th>版本</th><th>起止时间</th><th>状态</th><th>进度</th><th>当前步骤</th><th>负责人</th><th>创建时间</th><th style="text-align:center">操作</th></tr></thead>
+            <thead><tr><th>编号</th><th>任务名称</th><th>版本</th><th>起止时间</th><th>进度</th><th>当前步骤</th><th>当前步骤负责人</th><th>创建时间</th><th style="text-align:center">操作</th></tr></thead>
             <tbody id="tasksBody"></tbody>
           </table>
           <div class="empty" id="tasksEmpty" style="display:none">该项目下暂无任务</div>
@@ -502,7 +506,7 @@ tbody tr.clickable { cursor: pointer; }
       <div id="taskSearchResults" style="display:none">
         <div class="card">
           <table>
-            <thead><tr><th>编号</th><th>任务名称</th><th>所属产品</th><th>所属项目</th><th>起止时间</th><th>状态</th><th>进度</th><th>当前步骤</th><th>负责人</th><th>创建时间</th></tr></thead>
+            <thead><tr><th>编号</th><th>任务名称</th><th>所属产品</th><th>所属项目</th><th>起止时间</th><th>进度</th><th>当前步骤</th><th>当前步骤负责人</th><th>创建时间</th></tr></thead>
             <tbody id="searchBody"></tbody>
           </table>
           <div class="empty" id="searchEmpty" style="display:none">未找到匹配的任务</div>
@@ -521,7 +525,7 @@ tbody tr.clickable { cursor: pointer; }
       </div>
       <div class="card">
         <table>
-          <thead><tr><th>编号</th><th>任务名称</th><th>版本</th><th>起止时间</th><th>状态</th><th>进度</th><th>当前环节</th><th>我的角色</th><th>当前处理人</th></tr></thead>
+          <thead><tr><th>编号</th><th>任务名称</th><th>所属产品</th><th>所属项目</th><th>版本</th><th>起止时间</th><th>进度</th><th>当前步骤</th><th>我的角色</th><th>当前步骤负责人</th></tr></thead>
           <tbody id="myTasksBody"></tbody>
         </table>
         <div class="empty" id="myTasksEmpty" style="display:none">暂无任务</div>
@@ -610,6 +614,47 @@ tbody tr.clickable { cursor: pointer; }
         </div>
       </div>
       <div id="caselibWrap"></div>
+    </section>
+
+    <!-- 用例套件（收集固定用例，测试设计环节一键批量关联） -->
+    <section class="view" id="view-suite">
+      <div class="page-header">
+        <div><h2>用例套件</h2><div class="desc" id="suiteDesc">收集常用用例成套件 · 测试设计环节可一键批量关联到任务</div></div>
+        <div style="display:flex;gap:10px">
+          <span class="pp-manage-only"><button class="btn btn-primary" onclick="openSuiteModal(null)">+ 新建套件</button></span>
+        </div>
+      </div>
+      <div id="suiteWrap"></div>
+    </section>
+
+    <!-- 用例套件详情（按模块树聚合展示套件内用例） -->
+    <section class="view" id="view-suiteDetail">
+      <div class="page-header">
+        <div style="display:flex;align-items:center;gap:12px">
+          <button class="btn btn-sm" onclick="switchView('suite')">← 返回套件列表</button>
+          <div>
+            <h2 style="margin:0" id="sdTitle">套件详情</h2>
+            <div class="desc" id="sdDesc">—</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:10px">
+          <span class="pp-manage-only"><button class="btn btn-primary" onclick="openSuiteCasesModalFromDetail()">+ 添加用例</button></span>
+          <span class="pp-manage-only"><button class="btn btn-sm" onclick="openSuiteModalFromDetail()">编辑套件</button></span>
+        </div>
+      </div>
+      <div style="display:flex;gap:12px;align-items:flex-start;margin-top:12px">
+        <div style="width:260px;flex-shrink:0;border:1px solid var(--border);border-radius:8px;padding:0;background:#fff">
+          <div style="padding:10px 14px;font-weight:600;border-bottom:1px solid var(--border);font-size:14px">模块</div>
+          <div id="sdModTree" style="max-height:620px;overflow-y:auto;padding:4px 0"><div class="muted" style="padding:10px">加载中…</div></div>
+        </div>
+        <div class="card" style="flex:1;min-width:0;padding:0">
+          <div style="padding:12px 16px;border-bottom:1px solid var(--border);font-weight:600;display:flex;justify-content:space-between;align-items:center">
+            <span id="sdCaseTitle">套件用例</span>
+            <span class="muted" style="font-size:12px" id="sdCaseCount">0</span>
+          </div>
+          <div id="sdCaseList" style="padding:0"></div>
+        </div>
+      </div>
     </section>
 
     <!-- 问题单（产品 → 项目 → 测试任务，逐层下钻，对齐测试任务视图） -->
@@ -881,6 +926,77 @@ tbody tr.clickable { cursor: pointer; }
     <div class="modal-foot">
       <button class="btn" onclick="closeModal('libEditModal')">取消</button>
       <button class="btn btn-primary" onclick="saveLibEdit()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- 用例套件：新建/编辑弹窗 -->
+<div class="modal-mask" id="suiteModal">
+  <div class="modal" style="width:480px">
+    <div class="modal-head"><h3 id="suiteModalTitle">新建用例套件</h3><button class="modal-close" onclick="closeModal('suiteModal')">×</button></div>
+    <div class="modal-body">
+      <div class="field"><label>套件名称 *</label><input id="suiteName" placeholder="如：S8000 冒烟测试套件"></div>
+      <div class="field"><label>描述</label><textarea id="suiteDescInput" rows="2" placeholder="用途说明（选填）"></textarea></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn" onclick="closeModal('suiteModal')">取消</button>
+      <button class="btn btn-primary" onclick="saveSuite()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- 用例套件：添加用例到套件（左模块树 + 右候选用例） -->
+<div class="modal-mask" id="suiteCasesModal">
+  <div class="modal" style="width:960px;max-width:96vw">
+    <div class="modal-head"><h3 id="suiteCasesTitle">添加用例到套件</h3><button class="modal-close" onclick="closeModal('suiteCasesModal')">×</button></div>
+    <div class="modal-body">
+      <div style="display:flex;gap:12px;align-items:flex-start">
+        <!-- 左：模块树（可展开，点击模块筛选用例） -->
+        <div style="width:230px;flex-shrink:0;border:1px solid var(--border);border-radius:8px;padding:0">
+          <div style="padding:8px 10px;border-bottom:1px solid var(--border);font-weight:600;font-size:13px;display:flex;justify-content:space-between;align-items:center">
+            <span>模块</span>
+            <select id="scLibrary" onchange="scSwitchLibrary()" style="max-width:120px;font-size:12px;padding:2px 4px"></select>
+          </div>
+          <div id="scModTree" style="max-height:380px;overflow-y:auto;padding:4px 0">
+            <div class="muted" style="padding:10px">加载中…</div>
+          </div>
+        </div>
+        <!-- 右：候选用例（勾选） -->
+        <div style="flex:1;min-width:0">
+          <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+            <input id="scSearch" placeholder="搜索用例标题…" oninput="scOnSearch(this.value)" style="flex:1">
+            <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;white-space:nowrap">
+              <input type="checkbox" id="scCheckAll" onchange="scToggleAll(this.checked)"> 全选本页
+            </label>
+          </div>
+          <div style="border:1px solid var(--border);border-radius:8px;max-height:400px;overflow-y:auto" id="scCandidateList">
+            <div class="empty" style="padding:16px">请选择用例库</div>
+          </div>
+          <div style="margin-top:8px;display:flex;justify-content:space-between;align-items:center">
+            <span class="muted" style="font-size:12px" id="scSelInfo">未勾选用例</span>
+            <button class="btn btn-sm btn-primary" onclick="scAddSelected()">+ 添加选中到套件</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn" onclick="closeModal('suiteCasesModal')">关闭</button>
+    </div>
+  </div>
+</div>
+
+<!-- 测试设计：按套件批量关联 -->
+<div class="modal-mask" id="suiteLinkModal">
+  <div class="modal" style="width:560px">
+    <div class="modal-head"><h3>按套件批量关联用例</h3><button class="modal-close" onclick="closeModal('suiteLinkModal')">×</button></div>
+    <div class="modal-body">
+      <div class="muted" style="font-size:12px;margin-bottom:10px">点击套件即可把套件内的用例批量关联到本任务（已关联的会自动跳过）</div>
+      <div id="suiteLinkList" style="border:1px solid var(--border);border-radius:8px;max-height:360px;overflow-y:auto">
+        <div class="empty" style="padding:16px">加载中…</div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn" onclick="closeModal('suiteLinkModal')">关闭</button>
     </div>
   </div>
 </div>
@@ -1205,6 +1321,7 @@ function switchView(name) {
   if (name === 'people') renderUserRoles();
   if (name === 'pp') loadPPPage();
   if (name === 'caselib') loadCaseLibs();
+  if (name === 'suite') loadSuites();
   if (name === 'issues') loadIssueTree();
 }
 
@@ -1242,9 +1359,10 @@ async function loadMyTasks(mode = 'pending') {
       return `<tr class="clickable" onclick="openTask(${t.id})">
         <td style="font-family:monospace;color:var(--primary);font-weight:600">${esc(t.code)}</td>
         <td style="font-weight:500">${esc(t.name)}</td>
+        <td class="muted" style="font-size:12px">${esc(t.product_name || '—')}</td>
+        <td class="muted" style="font-size:12px">${esc(t.project_name || '—')}</td>
         <td>${esc(t.version || '—')}</td>
         <td class="muted" style="font-size:12px">${formatTaskDateRange(t)}</td>
-        <td>${statusBadge(t.status)}</td>
         <td>${t.progress}%</td>
         <td><span class="badge ${isMyTurn ? 'badge-blue' : 'badge-gray'}">${t.current_step}. ${t.current_step_name || STEP_NAMES[t.current_step-1] || '—'}</span></td>
         <td>${myRoles.map(r => `<span class="badge badge-gray">${r}</span>`).join(' ') || '—'}</td>
@@ -1538,9 +1656,8 @@ function onTaskSearch() {
       <td style="font-family:monospace;color:var(--primary);font-weight:600;font-size:12px">${esc(t.code)}</td>
       <td style="font-weight:500">${esc(t.name)}</td>
       <td class="muted" style="font-size:12px">${esc(t.product_name || '—')}</td>
-      <td class="muted" style="font-size:12px">${esc(zentaoProjectsCache.find(p => p.id === t.project_id)?.name || '—')}</td>
+      <td class="muted" style="font-size:12px">${esc(t.project_name || '—')}</td>
       <td class="muted" style="font-size:12px">${formatTaskDateRange(t)}</td>
-      <td>${statusBadge(t.status)}</td>
       <td style="min-width:100px">
         <div style="display:flex;align-items:center;gap:8px">
           <div style="flex:1;height:6px;background:#e2e8f0;border-radius:3px;overflow:hidden">
@@ -1681,7 +1798,6 @@ function renderTaskNavTasks() {
       <td style="font-weight:500">${esc(t.name)}</td>
       <td><span class="muted" style="font-size:12px">${esc(t.version || '—')}</span></td>
       <td class="muted" style="font-size:12px">${formatTaskDateRange(t)}</td>
-      <td>${statusBadge(t.status)}</td>
       <td style="min-width:100px">
         <div style="display:flex;align-items:center;gap:8px">
           <div style="flex:1;height:6px;background:#e2e8f0;border-radius:3px;overflow:hidden">
@@ -1715,9 +1831,9 @@ function renderRecent(tasks) {
       <td style="font-family:monospace;color:var(--primary);font-weight:600">${esc(t.code)}</td>
       <td style="font-weight:500">${esc(t.name)}</td>
       <td>${esc(t.version || '—')}</td>
-      <td>${statusBadge(t.status)}</td>
       <td>${t.progress}%</td>
       <td>${t.current_step}. ${t.current_step_name || STEP_NAMES[t.current_step-1] || '—'}</td>
+      <td style="font-size:12px">${esc(t.current_step === 9 ? `PL:${userName(t.owner)} + TSE:${userName(t.tse_id)}` : (t.current_step_assignee_name || userName(t.owner)))}</td>
     </tr>`).join('') || '<tr><td colspan="6" class="empty">暂无任务</td></tr>';
 }
 
@@ -1734,7 +1850,8 @@ async function openTask(id) {
   document.getElementById('dStatus').innerHTML = statusBadge(currentTask.status);
   const t = currentTask;
   document.getElementById('dMeta').innerHTML = `
-    <span>待测产品：<b>${esc(t.product_name || '—')}</b></span>
+    <span>所属产品：<b>${esc(t.product_name || '—')}</b></span>
+    <span>所属项目：<b>${esc(t.project_name || '—')}</b></span>
     <span>版本：<b>${esc(t.version || '—')}</b></span>
     <span>类型：<b>${{integration:'集成测试',functional:'功能测试',performance:'性能测试',regression:'回归测试'}[t.test_type] || t.test_type}</b></span>
     <span>PL：<b>${esc(userName(t.owner))}</b></span>
@@ -1753,18 +1870,8 @@ const STEP_FORMS = {
   2: { criteria: '关联测试方案链接 + 关联测试用例（均必填）', fields: [
     { key: 'test_plan_url', label: '测试方案链接', type: 'url', full: true, required: true },
   ], requireCases: true },
-  3: { criteria: '被测版本信息 + 依赖版本信息（无的填"无"）', fields: [
-    { key: 'target_version', label: '被测版本信息', type: 'text', full: true },
-    { key: 'hdm_version', label: 'HDM版本' }, { key: 'bios_version', label: 'BIOS版本' },
-    { key: 'model_image_version', label: '模型镜像版本' }, { key: 'comm_lib_version', label: '通信库版本' },
-    { key: 'gdr_version', label: 'GDR版本' }, { key: 'switch_node_version', label: '交换节点版本' },
-    { key: 'os_version', label: 'OS版本' }, { key: 'gpu_driver_version', label: 'GPU驱动版本' },
-    { key: 'gpu_firmware_version', label: 'GPU固件版本' }, { key: 'nic_driver_version', label: '网卡驱动版本' },
-    { key: 'nic_firmware_version', label: '网卡固件版本' }, { key: 'mb_cpld_version', label: '主板CPLD版本' },
-    { key: 'switch_cpld_version', label: 'Switch CPLD版本' }, { key: 'retimer_version', label: 'retimer版本' },
-    { key: 'stress_tool_version', label: '压测工具版本' },
-  ]},
-  4: { criteria: '测试环境CPU、内存、IP + 环境自检报告附件（附件必传）', attachments: 'env_check', requireAttachment: true, fields: [
+  3: { criteria: '上传版本配套表（附件必传，未上传不可进入下一环节）', attachments: 'version_config', attachmentLabel: '版本配套表', requireAttachment: true },
+  4: { criteria: '测试环境CPU、内存、IP + 环境自检报告附件（附件必传）', attachments: 'env_check', attachmentLabel: '环境自检报告', requireAttachment: true, fields: [
     { key: 'cpu', label: 'CPU', full: true },
     { key: 'memory', label: '内存' }, { key: 'ip', label: '测试环境IP' },
   ]},
@@ -1793,7 +1900,8 @@ function renderStepForm(s, taskId, isCurrent, canOperate) {
     if (!currentTask) return '';
     return `<div class="step-readonly">
       <span class="kv">任务名称：<b>${esc(currentTask.name)}</b></span>
-      <span class="kv">待测产品：<b>${esc(currentTask.product_name || '—')}</b></span>
+      <span class="kv">所属产品：<b>${esc(currentTask.product_name || '—')}</b></span>
+      <span class="kv">所属项目：<b>${esc(currentTask.project_name || '—')}</b></span>
       <span class="kv">编号：<b>${esc(currentTask.code)}</b></span>
       <span class="kv">版本：<b>${esc(currentTask.version || '—')}</b></span>
     </div>`;
@@ -1879,7 +1987,7 @@ function renderStepForm(s, taskId, isCurrent, canOperate) {
   if (!isDone) {
     if (isCurrent && canOperate) {
       html += `<div class="step-actions">`;
-      html += `<button class="btn btn-sm" onclick="saveStepData(${taskId}, ${s.id})">💾 保存数据</button>`;
+      if (cfg.fields) html += `<button class="btn btn-sm" onclick="saveStepData(${taskId}, ${s.id})">💾 保存数据</button>`;
       if (s.step === 5) {
         html += `<button class="btn btn-sm btn-primary" onclick="submitReviewStep(${taskId}, ${s.id}, ${s.step})">提交审核</button>`;
       } else if (s.step <= 8 || s.step === 10) {
@@ -1952,12 +2060,13 @@ async function completeStep(taskId, stepId) {
       return;
     }
   }
-  // 3. 校验必传附件（requireAttachment: true，步骤4）
+  // 3. 校验必传附件（requireAttachment: true，步骤3 版本配套 / 步骤4 环境自检）
   if (cfg && cfg.requireAttachment) {
     try {
       const files = await api(`/api/tasks/${taskId}/steps/${stepId}/files`);
       if (!files || !files.length) {
-        toast('请上传环境自检报告附件再完成本环节', true);
+        const attLabel = (cfg && cfg.attachmentLabel) || '必传附件';
+        toast(`请上传${attLabel}再完成本环节`, true);
         return;
       }
     } catch (e) { toast('附件校验失败：' + e.message, true); return; }
@@ -2065,6 +2174,474 @@ async function submitReviewStep(taskId, stepId, stepNo) {
     const result = await api(`/api/tasks/${taskId}/steps/${stepId}`, { method: 'PUT', body: { status, remark: extData.remark || extData.review_comment || '' } });
     toast(stepNo === 5 && decision === 'reject' ? '已打回，环境确认环节重新处理' : (stepNo === 9 && decision === 'retest' ? '需补测，退回环节8（测试完成）由版本负责人组织补测' : '审核已通过'));
     openTask(taskId);
+  } catch (e) { toast(e.message, true); }
+}
+
+// ============ 用例套件管理 ============
+let suiteCache = [];
+let editSuiteId = null;        // 正在编辑的套件ID（null 表示新建）
+let scSuiteId = null;          // 当前管理用例的套件ID
+let scMods = [];               // 左侧模块树数据
+let scExpanded = new Set();    // 已展开的模块ID
+let scCurrentModule = 0;       // 当前选中模块：0=全部, -1=未分类, >0=具体模块
+let scKeyword = '';            // 用例搜索关键词
+let scSelectedIds = new Set(); // 已勾选的用例ID（跨模块保留）
+let scCandidates = [];         // 当前列表展示的候选用例
+let scUncatCount = 0;          // 未分类用例数
+let scSearchTimer = null;
+
+// 用例套件详情页状态
+let sdSuiteId = null;
+let sdSuite = null;              // 当前套件元数据
+let sdCases = [];                // 套件内所有用例（含 module_path）
+let sdTree = [];                 // 模块树根节点
+let sdExpanded = new Set();      // 展开节点 uid
+let sdCurrentPath = [];          // 当前选中的模块路径（[]=全部）
+let sdNodeUidCounter = 0;
+
+async function loadSuites() {
+  const wrap = document.getElementById('suiteWrap');
+  if (!wrap) return;
+  try {
+    suiteCache = await api('/api/suites');
+  } catch (e) {
+    wrap.innerHTML = `<div class="card"><div class="empty">加载失败：${esc(e.message)}</div></div>`;
+    return;
+  }
+  // 非 PL/TSE/管理员 → 只读提示
+  const desc = document.getElementById('suiteDesc');
+  if (desc) {
+    desc.textContent = canManageTasks()
+      ? '收集常用用例成套件 · 测试设计环节可一键批量关联到任务'
+      : '收集常用用例成套件 · 测试设计环节可一键批量关联到任务（只读）';
+  }
+  renderSuites();
+}
+
+function renderSuites() {
+  const wrap = document.getElementById('suiteWrap');
+  if (!wrap) return;
+  if (!suiteCache.length) {
+    wrap.innerHTML = '<div class="card"><div class="empty">暂无用例套件，点击右上角新建</div></div>';
+    return;
+  }
+  const canManage = canManageTasks();
+  wrap.innerHTML = `<div class="card" style="padding:0">
+    <table class="table" style="margin:0">
+      <thead><tr><th style="width:60px">ID</th><th>套件名称</th><th>描述</th><th style="width:90px">用例数</th><th style="width:120px">创建人</th><th style="width:200px">操作</th></tr></thead>
+      <tbody>${suiteCache.map(s => `
+        <tr>
+          <td class="muted">${s.id}</td>
+          <td style="font-weight:500"><a href="javascript:void(0)" style="color:var(--primary);text-decoration:none;font-weight:600" onclick="openSuiteDetail(${s.id})">📦 ${esc(s.name)}</a></td>
+          <td class="muted" style="font-size:13px">${esc(s.description || '—')}</td>
+          <td><span class="badge badge-blue">${s.case_count}</span></td>
+          <td class="muted" style="font-size:13px">${esc(s.created_by_name || '—')}</td>
+          <td>
+            <button class="btn btn-sm" onclick="openSuiteDetail(${s.id})">进入</button>
+            ${canManage ? `<button class="btn btn-sm" onclick="openSuiteModal(${s.id})">编辑</button>
+            <button class="btn btn-sm" style="color:var(--danger)" onclick="deleteSuite(${s.id}, '${esc(s.name).replace(/'/g, '')}')">删除</button>` : ''}
+          </td>
+        </tr>`).join('')}
+      </tbody>
+    </table>
+  </div>`;
+}
+
+// ---- 用例套件详情页（套件名称点击进入） ----
+async function openSuiteDetail(suiteId) {
+  sdSuiteId = suiteId;
+  sdCurrentPath = [];
+  switchView('suiteDetail');
+  await loadSuiteDetail();
+}
+
+async function loadSuiteDetail() {
+  if (!sdSuiteId) return;
+  try {
+    const all = await api('/api/suites');
+    sdSuite = all.find(s => s.id === sdSuiteId) || null;
+  } catch (e) { toast('套件信息加载失败：' + e.message, true); return; }
+  if (sdSuite) {
+    document.getElementById('sdTitle').textContent = '📦 ' + sdSuite.name;
+    document.getElementById('sdDesc').textContent = sdSuite.description || '—';
+  }
+  try {
+    sdCases = await api(`/api/suites/${sdSuiteId}/cases`);
+  } catch (e) {
+    document.getElementById('sdCaseList').innerHTML =
+      `<div class="empty" style="padding:16px;color:var(--danger)">加载失败：${esc(e.message)}</div>`;
+    return;
+  }
+  sdBuildTree();
+  document.getElementById('sdCaseCount').textContent = `共 ${sdCases.length} 条用例`;
+  sdRenderTree();
+  sdRenderCases();
+}
+
+// 依据用例的 module_path 构建模块树（按路径去重，节点记录子树用例数）
+function sdBuildTree() {
+  sdNodeUidCounter = 0;
+  const root = { uid: 'root', name: '全部用例', path: [], children: [], count: 0 };
+  const findOrCreate = (parent, name) => {
+    let n = parent.children.find(c => c.name === name);
+    if (!n) {
+      n = { uid: 'n' + (++sdNodeUidCounter), name, path: [...parent.path, name], children: [], count: 0 };
+      parent.children.push(n);
+    }
+    return n;
+  };
+  sdCases.forEach(c => {
+    const p = c.module_path || [];
+    if (!p.length) { root.count += 1; return; }
+    let cur = root;
+    p.forEach(name => { cur = findOrCreate(cur, name); cur.count += 1; });
+  });
+  root.count = sdCases.length;   // 根节点显示套件用例总数
+  sdTree = [root];
+  if (sdCases.length) sdExpanded = new Set([root.uid]);
+}
+
+function sdRenderTree() {
+  const wrap = document.getElementById('sdModTree');
+  if (!wrap) return;
+  if (!sdCases.length) { wrap.innerHTML = '<div class="muted" style="padding:10px">套件内暂无用例</div>'; return; }
+  const render = (nodes, depth) => nodes.map(n => {
+    const expandable = n.children.length > 0;
+    const isOpen = sdExpanded.has(n.uid);
+    const active = sdCurrentPath.join('\u0000') === n.path.join('\u0000') ? 'color:var(--primary);font-weight:600' : '';
+    return `
+      <div>
+        <div style="display:flex;align-items:center;gap:4px;padding:4px ${depth * 12 + 8}px;cursor:pointer" onclick="sdTreeClick('${n.uid}')">
+          ${expandable ? `<span style="width:14px;flex-shrink:0;color:var(--text-sub);font-size:10px;cursor:pointer" onclick="event.stopPropagation();sdToggleExpand('${n.uid}')">${isOpen ? '▼' : '▶'}</span>` : '<span style="width:14px;flex-shrink:0"></span>'}
+          <span style="flex:1;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;${active}">${esc(n.name)}</span>
+          <span class="muted" style="font-size:11px;flex-shrink:0">${n.count}</span>
+        </div>
+        ${expandable && isOpen ? render(n.children, depth + 1) : ''}
+      </div>`;
+  }).join('');
+  wrap.innerHTML = render(sdTree, 0);
+}
+
+function sdFindNode(uid) {
+  const walk = ns => {
+    for (const n of ns) {
+      if (n.uid === uid) return n;
+      const f = walk(n.children);
+      if (f) return f;
+    }
+    return null;
+  };
+  return walk(sdTree);
+}
+
+function sdTreeClick(uid) {
+  const node = sdFindNode(uid);
+  if (!node) return;
+  sdCurrentPath = node.path;
+  sdRenderTree();
+  sdRenderCases();
+}
+function sdToggleExpand(uid) {
+  if (sdExpanded.has(uid)) sdExpanded.delete(uid); else sdExpanded.add(uid);
+  sdRenderTree();
+}
+
+function sdRenderCases() {
+  const el = document.getElementById('sdCaseList');
+  if (!el) return;
+  // 按模块路径前缀匹配（点父模块时包含全部子孙模块用例）
+  const cases = sdCases.filter(c => {
+    const p = c.module_path || [];
+    return sdCurrentPath.every((seg, i) => p[i] === seg);
+  });
+  document.getElementById('sdCaseTitle').textContent =
+    sdCurrentPath.length ? sdCurrentPath.join(' / ') : '套件用例';
+  document.getElementById('sdCaseCount').textContent = `${cases.length} / ${sdCases.length} 条用例`;
+  if (!cases.length) { el.innerHTML = '<div class="empty" style="padding:16px">该模块下暂无用例</div>'; return; }
+  const canManage = canManageTasks();
+  el.innerHTML = cases.map(c => `
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:10px 16px;border-bottom:1px solid var(--border);font-size:13px">
+      <div style="flex:1;min-width:0">
+        <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(c.title)}">${esc(c.title)}</div>
+        <div class="muted" style="font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc((c.module_path || []).join(' / '))}">${esc((c.module_path || []).join(' / ') || '—')} · 优先级P${c.pri || 3}</div>
+      </div>
+      ${canManage ? `<button class="btn btn-sm" style="color:var(--danger);padding:2px 6px;font-size:11px" onclick="sdRemoveCase(${c.id})">移除</button>` : ''}
+    </div>`).join('');
+}
+
+async function sdRemoveCase(caseId) {
+  if (!confirm('确认从套件中移除该用例？')) return;
+  try {
+    await api(`/api/suites/${sdSuiteId}/cases/${caseId}`, { method: 'DELETE' });
+    toast('已移除');
+    await loadSuiteDetail();
+    await loadSuites();
+  } catch (e) { toast(e.message, true); }
+}
+
+function openSuiteCasesModalFromDetail() {
+  if (!sdSuiteId) return;
+  openSuiteCasesModal(sdSuiteId, sdSuite ? sdSuite.name : '');
+}
+function openSuiteModalFromDetail() {
+  if (!sdSuiteId) return;
+  openSuiteModal(sdSuiteId);
+}
+
+function openSuiteModal(suiteId) {
+  editSuiteId = suiteId;
+  const s = suiteId ? suiteCache.find(x => x.id === suiteId) : null;
+  document.getElementById('suiteModalTitle').textContent = suiteId ? '编辑用例套件' : '新建用例套件';
+  document.getElementById('suiteName').value = s ? s.name : '';
+  document.getElementById('suiteDescInput').value = s ? (s.description || '') : '';
+  document.getElementById('suiteModal').classList.add('show');
+}
+
+async function saveSuite() {
+  const name = document.getElementById('suiteName').value.trim();
+  const description = document.getElementById('suiteDescInput').value.trim();
+  if (!name) { toast('请填写套件名称', true); return; }
+  try {
+    if (editSuiteId) {
+      await api(`/api/suites/${editSuiteId}`, { method: 'PUT', body: { name, description } });
+      toast('套件已更新');
+    } else {
+      await api('/api/suites', { method: 'POST', body: { name, description } });
+      toast('套件已创建');
+    }
+    closeModal('suiteModal');
+    await loadSuites();
+  } catch (e) { toast(e.message, true); }
+}
+
+async function deleteSuite(suiteId, name) {
+  if (!confirm(`确认删除套件「${name}」？套件内的用例关联会一并清除（用例本身不受影响）`)) return;
+  try {
+    await api(`/api/suites/${suiteId}`, { method: 'DELETE' });
+    toast('套件已删除');
+    await loadSuites();
+  } catch (e) { toast(e.message, true); }
+}
+
+// ---- 套件内用例管理（左：模块树，中：候选用例勾选，右：套件内用例） ----
+async function openSuiteCasesModal(suiteId, suiteName) {
+  scSuiteId = suiteId;
+  scSelectedIds = new Set();
+  scCurrentModule = 0;
+  scKeyword = '';
+  const si = document.getElementById('scSearch');
+  if (si) si.value = '';
+  document.getElementById('suiteCasesTitle').textContent = `添加用例 · ${suiteName || ''}`;
+  document.getElementById('suiteCasesModal').classList.add('show');
+  try {
+    const libs = await api('/api/cases/libraries');
+    const sel = document.getElementById('scLibrary');
+    sel.innerHTML = libs.map(l => `<option value="${l.id}">${esc(l.name)}</option>`).join('');
+    if (libs.length) await scSwitchLibrary();
+  } catch (e) { toast('用例库加载失败：' + e.message, true); }
+}
+
+async function scSwitchLibrary() {
+  scCurrentModule = 0;
+  scKeyword = '';
+  scSelectedIds = new Set();
+  await scLoadModules();
+  await scLoadCases();
+}
+
+async function scLoadModules() {
+  const libId = document.getElementById('scLibrary').value;
+  const wrap = document.getElementById('scModTree');
+  if (!libId) { wrap.innerHTML = '<div class="muted" style="padding:10px">暂无用例库</div>'; return; }
+  let resp = { modules: [], uncategorized_count: 0 };
+  try {
+    resp = await api(`/api/cases/libraries/${libId}/modules`);
+    if (Array.isArray(resp)) resp = { modules: resp, uncategorized_count: 0 };
+  } catch (e) {
+    wrap.innerHTML = `<div class="muted" style="padding:10px;color:var(--danger)">${esc(e.message)}</div>`;
+    return;
+  }
+  scMods = resp.modules || [];
+  scUncatCount = resp.uncategorized_count || 0;
+  scExpanded = new Set(scMods.map(m => m.id));
+  scRenderTree();
+}
+
+function scRenderTree() {
+  const wrap = document.getElementById('scModTree');
+  if (!wrap) return;
+  if (!scMods.length) { wrap.innerHTML = '<div class="muted" style="padding:10px">暂无模块</div>'; return; }
+  const byParent = {};
+  scMods.forEach(m => { (byParent[m.parent_id] ||= []).push(m); });
+  const hasKids = id => (byParent[id] || []).length > 0;
+  const render = (parentId, depth) => {
+    const kids = byParent[parentId] || [];
+    if (!kids.length) return '';
+    return kids.map(m => {
+      const expandable = hasKids(m.id);
+      const isOpen = scExpanded.has(m.id);
+      const active = scCurrentModule === m.id ? 'color:var(--primary);font-weight:600' : '';
+      return `
+      <div>
+        <div style="display:flex;align-items:center;gap:4px;padding:4px ${depth * 12 + 8}px;cursor:pointer" onclick="scTreeClick(event, ${m.id})">
+          ${expandable ? `<span style="width:14px;flex-shrink:0;color:var(--text-sub);font-size:10px;cursor:pointer" onclick="event.stopPropagation();scToggleExpand(${m.id})">${isOpen ? '▼' : '▶'}</span>` : '<span style="width:14px;flex-shrink:0"></span>'}
+          <span style="flex:1;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;${active}">${esc(m.name)}</span>
+          <span class="muted" style="font-size:11px;flex-shrink:0">${m.total_case_count ?? m.case_count}</span>
+        </div>
+        ${expandable && isOpen ? render(m.id, depth + 1) : ''}
+      </div>`;
+    }).join('');
+  };
+  let html = `
+    <div style="display:flex;align-items:center;gap:4px;padding:4px 8px;cursor:pointer" onclick="scTreeClick(event, 0)">
+      <span style="width:14px;flex-shrink:0"></span>
+      <span style="flex:1;font-size:13px;font-weight:600;${scCurrentModule === 0 ? 'color:var(--primary)' : ''}">全部用例</span>
+    </div>`;
+  html += render(null, 0);
+  if (scUncatCount) {
+    html += `
+    <div style="display:flex;align-items:center;gap:4px;padding:4px 8px;cursor:pointer" onclick="scTreeClick(event, -1)">
+      <span style="width:14px;flex-shrink:0"></span>
+      <span style="flex:1;font-size:13px;${scCurrentModule === -1 ? 'color:var(--primary);font-weight:600' : ''}">未分类</span>
+      <span class="muted" style="font-size:11px">${scUncatCount}</span>
+    </div>`;
+  }
+  wrap.innerHTML = html;
+}
+
+function scTreeClick(ev, modId) {
+  scCurrentModule = modId;
+  scRenderTree();
+  scLoadCases();
+}
+function scToggleExpand(id) {
+  if (scExpanded.has(id)) scExpanded.delete(id); else scExpanded.add(id);
+  scRenderTree();
+}
+
+function scOnSearch(v) {
+  clearTimeout(scSearchTimer);
+  scSearchTimer = setTimeout(() => {
+    scKeyword = (v || '').trim();
+    scLoadCases();
+  }, 300);
+}
+
+async function scLoadCases() {
+  const libId = document.getElementById('scLibrary').value;
+  const listEl = document.getElementById('scCandidateList');
+  if (!libId) { listEl.innerHTML = '<div class="empty" style="padding:16px">请选择用例库</div>'; return; }
+  listEl.innerHTML = '<div class="muted" style="padding:12px">加载中…</div>';
+  try {
+    let url = `/api/cases/libraries/${libId}/cases`;
+    const params = [];
+    // 服务端会递归包含该模块的全部子模块用例
+    if (scCurrentModule > 0) params.push(`module_id=${scCurrentModule}`);
+    else if (scCurrentModule === -1) params.push(`module_id=0`);
+    if (scKeyword) params.push(`keyword=${encodeURIComponent(scKeyword)}`);
+    if (params.length) url += '?' + params.join('&');
+    scCandidates = await api(url);
+    scRenderCandidates();
+  } catch (e) {
+    listEl.innerHTML = `<div class="empty" style="padding:16px;color:var(--danger)">加载失败：${esc(e.message)}</div>`;
+  }
+}
+
+function scRenderCandidates() {
+  const listEl = document.getElementById('scCandidateList');
+  if (!listEl) return;
+  if (!scCandidates.length) {
+    listEl.innerHTML = '<div class="empty" style="padding:16px">该模块下暂无用例</div>';
+    scSyncCheckAll();
+    scUpdateSelInfo();
+    return;
+  }
+  listEl.innerHTML = scCandidates.map(c => `
+    <label style="display:flex;gap:8px;align-items:flex-start;padding:7px 10px;border-bottom:1px solid var(--border);cursor:pointer;font-size:13px;line-height:1.35">
+      <input type="checkbox" class="sc-chk" value="${c.id}" ${scSelectedIds.has(c.id) ? 'checked' : ''} style="margin-top:4px" onchange="scToggleCase(${c.id}, this.checked)">
+      <div style="flex:1;min-width:0;overflow:hidden">
+        <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(c.title)}">${esc(c.title)}</div>
+        <div class="muted" style="font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc((c.module_path || []).join(' / '))}">${esc((c.module_path || []).join(' / ') || '—')}</div>
+      </div>
+    </label>`).join('');
+  scSyncCheckAll();
+  scUpdateSelInfo();
+}
+
+function scToggleCase(id, checked) {
+  if (checked) scSelectedIds.add(id); else scSelectedIds.delete(id);
+  scSyncCheckAll();
+  scUpdateSelInfo();
+}
+
+function scToggleAll(checked) {
+  scCandidates.forEach(c => { if (checked) scSelectedIds.add(c.id); else scSelectedIds.delete(c.id); });
+  scRenderCandidates();
+}
+
+function scSyncCheckAll() {
+  const el = document.getElementById('scCheckAll');
+  if (!el) return;
+  el.checked = scCandidates.length > 0 && scCandidates.every(c => scSelectedIds.has(c.id));
+}
+
+function scUpdateSelInfo() {
+  const el = document.getElementById('scSelInfo');
+  if (el) el.textContent = scSelectedIds.size ? `已勾选 ${scSelectedIds.size} 条用例` : '未勾选用例';
+}
+
+async function scAddSelected() {
+  if (!scSelectedIds.size) { toast('请先勾选用例', true); return; }
+  const ids = [...scSelectedIds];
+  try {
+    const r = await api(`/api/suites/${scSuiteId}/cases`, { method: 'POST', body: { case_ids: ids } });
+    toast(`已添加 ${r.added} 条用例${ids.length - r.added > 0 ? `（${ids.length - r.added} 条已存在跳过）` : ''}`);
+    scSelectedIds = new Set();
+    closeModal('suiteCasesModal');
+    // 若当前停在套件详情页则刷新详情，否则只刷新列表
+    if (sdSuiteId === scSuiteId && document.getElementById('view-suiteDetail')?.classList.contains('active')) {
+      await loadSuiteDetail();
+    }
+    await loadSuites();
+  } catch (e) { toast(e.message, true); }
+}
+
+// ---- 测试设计：按套件批量关联 ----
+let suiteLinkTaskId = null;
+
+async function openSuiteLinkModal(taskId) {
+  suiteLinkTaskId = taskId;
+  document.getElementById('suiteLinkModal').classList.add('show');
+  const el = document.getElementById('suiteLinkList');
+  el.innerHTML = '<div class="empty" style="padding:16px">加载中…</div>';
+  try {
+    const suites = await api('/api/suites');
+    if (!suites.length) { el.innerHTML = '<div class="empty" style="padding:16px">还没有用例套件，请先到「用例套件」新建</div>'; return; }
+    el.innerHTML = suites.map(s => `
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border-bottom:1px solid var(--border);cursor:pointer"
+           onclick="linkSuiteToTask(${s.id}, '${esc(s.name).replace(/'/g, '')}')">
+        <div>
+          <div style="font-weight:500;font-size:14px">📦 ${esc(s.name)}</div>
+          <div class="muted" style="font-size:12px">${esc(s.description || '—')}</div>
+        </div>
+        <span class="badge badge-blue">${s.case_count} 用例</span>
+      </div>`).join('');
+  } catch (e) {
+    el.innerHTML = `<div class="empty" style="padding:16px;color:var(--danger)">加载失败：${esc(e.message)}</div>`;
+  }
+}
+
+async function linkSuiteToTask(suiteId, suiteName) {
+  if (!suiteLinkTaskId) return;
+  try {
+    const r = await api(`/api/suites/${suiteId}/link-to-task/${suiteLinkTaskId}`, { method: 'POST' });
+    if (!r.created && r.skipped) {
+      toast(`套件「${suiteName}」的 ${r.skipped} 条用例已全部关联过`);
+    } else {
+      toast(`已关联 ${r.created} 条用例${r.skipped ? `（${r.skipped} 条已存在跳过）` : ''}`);
+    }
+    closeModal('suiteLinkModal');
+    selectStep(activeStepNo || 2);
   } catch (e) { toast(e.message, true); }
 }
 
@@ -2632,10 +3209,10 @@ async function saveCase() {
 }
 
 async function deleteCase(caseId) {
-  if (!confirm('确认删除该用例？')) return;
+  if (!confirm('确认删除该用例？若该用例已被测试任务引用，相关任务中的用例关联与执行结果也会一并移除。')) return;
   try {
-    await api(`/api/cases/cases/${caseId}`, { method: 'DELETE' });
-    toast('已删除');
+    const r = await api(`/api/cases/cases/${caseId}`, { method: 'DELETE' });
+    toast(r && r.unlinked ? `已删除（同时移除 ${r.unlinked} 个任务中的用例关联）` : '已删除');
     loadCasesByModule(0);
   } catch (e) { toast(e.message, true); }
 }
@@ -2891,6 +3468,7 @@ function renderCaseSection(s, taskId, isCurrent, canOperate) {
         <b>测试用例关联</b>
         <span style="display:flex;gap:8px;align-items:center">
           <button class="btn btn-sm" onclick="exportTestPlan(${taskId})">⬇ 导出测试计划表</button>
+          ${canEdit ? `<button class="btn btn-sm" onclick="openSuiteLinkModal(${taskId})">📦 按套件关联</button>` : ''}
           ${canEdit ? `<button class="btn btn-sm btn-primary" onclick="openLinkCasesPage(${taskId})">+ 关联用例</button>` : ''}
         </span>
       </div>
@@ -3840,9 +4418,11 @@ function renderStepPage(stepNo) {
 
 // ============ 步骤附件（环境自检报告等） ============
 function renderStepFiles(s, taskId, canEdit, category) {
+  const cfg = STEP_FORMS[s.step];
+  const title = (cfg && cfg.attachmentLabel) || '附件';
   return `<div class="step-files" id="stepFiles_${s.id}" style="margin-top:14px;border-top:1px dashed var(--border);padding-top:12px">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-      <b>📎 环境自检报告</b>
+      <b>📎 ${esc(title)}</b>
       ${canEdit ? `
         <label class="btn btn-sm btn-primary" style="cursor:pointer;margin:0">
           <input type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.md,.json,.xml,.png,.jpg,.jpeg,.gif,.bmp,.webp,.zip,.tar,.gz,.7z,.rar" style="display:none" onchange="uploadStepFile(${taskId}, ${s.id}, this)">
@@ -3906,6 +4486,9 @@ async function loadStepFiles(stepId) {
 async function uploadStepFile(taskId, stepId, input) {
   const file = input.files && input.files[0];
   if (!file) return;
+  // 从步骤配置推导附件分类（版本配套 / 环境自检等），避免写死 env_check
+  const step = stepCache.find(x => x.id === stepId);
+  const category = (step && STEP_FORMS[step.step]?.attachments) || 'env_check';
   // 提取文件扩展名并校验
   const ext = (file.name || '').split('.').pop().toLowerCase();
   const allowed = ['pdf','doc','docx','xls','xlsx','ppt','pptx','txt','csv','md','json','xml','png','jpg','jpeg','gif','bmp','webp','zip','tar','gz','7z','rar'];
@@ -3925,7 +4508,7 @@ async function uploadStepFile(taskId, stepId, input) {
   try {
     const form = new FormData();
     form.append('file', file);
-    form.append('category', 'env_check');
+    form.append('category', category);
     const resp = await fetch(`${API}/api/tasks/${taskId}/steps/${stepId}/files`, {
       method: 'POST',
       credentials: 'same-origin',
@@ -4330,6 +4913,9 @@ async function createTask() {
   const owner = document.getElementById('cOwner').value;
   if (!owner) { toast('请选择PL负责人', true); return; }
   const projectId = document.getElementById('cProject').value;
+  if (!projectId) { toast('请选择所属项目', true); return; }
+  const productId = document.getElementById('cProduct').value;
+  if (!productId) { toast('请选择所属产品', true); return; }
   const begin = document.getElementById('cBegin').value;
   const end = document.getElementById('cEnd').value;
   // 任务周期必须落在项目周期内
@@ -4355,7 +4941,6 @@ async function createTask() {
   } else if (begin && end && begin > end) {
     toast('任务开始日期不能晚于结束日期', true); return;
   }
-  const productId = document.getElementById('cProduct').value;
   const productName = productId ? (zentaoProductsCache.find(p => p.id == productId) || {}).name : null;
   const executorId = document.getElementById('cExecutor').value ? parseInt(document.getElementById('cExecutor').value) : null;
   // 额外执行人：以界面为准收集，并去掉与主执行人重复的

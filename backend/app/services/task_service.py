@@ -186,6 +186,14 @@ class TaskService:
         result = await self.db.execute(stmt)
         tasks = result.scalars().all()
         
+        # 批量补充 project_name（避免前端二次查询）
+        project_ids = {t.project_id for t in tasks if t.project_id}
+        if project_ids:
+            proj_res = await self.db.execute(select(Project.id, Project.name).where(Project.id.in_(project_ids)))
+            project_name_map = {row[0]: row[1] for row in proj_res.all()}
+            for t in tasks:
+                t.project_name = project_name_map.get(t.project_id)
+        
         return list(tasks), total
     
     async def get_task(self, task_id: int) -> Optional[TestTask]:
@@ -196,7 +204,11 @@ class TaskService:
             selectinload(TestTask.actions)
         ).where(TestTask.id == task_id)
         result = await self.db.execute(stmt)
-        return result.scalar_one_or_none()
+        task = result.scalar_one_or_none()
+        if task and task.project_id:
+            proj = (await self.db.execute(select(Project.name).where(Project.id == task.project_id))).scalar_one_or_none()
+            task.project_name = proj
+        return task
     
     async def update_task(self, task_id: int, data: TaskUpdate) -> Optional[TestTask]:
         """更新任务"""

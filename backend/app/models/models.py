@@ -1,7 +1,7 @@
 """
 数据模型 - 测试任务
 """
-from sqlalchemy import Column, Integer, String, Date, Text, DateTime, ForeignKey, Enum, Boolean, JSON
+from sqlalchemy import Column, Integer, String, Date, Text, DateTime, ForeignKey, Enum, Boolean, JSON, UniqueConstraint
 from sqlalchemy.orm import relationship, backref
 from sqlalchemy.sql import func
 from app.db.database import Base
@@ -322,3 +322,29 @@ class StepFile(Base):
     category = Column(String(30), default="env_check", comment="附件分类: env_check/其他")
     uploaded_by = Column(Integer, nullable=True, comment="上传人ID")
     uploaded_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+# 用例套件表（收集固定用例，测试设计环节可一键批量关联到任务）
+class CaseSuite(Base):
+    __tablename__ = "case_suites"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    name = Column(String(200), nullable=False, comment="套件名称")
+    description = Column(Text, nullable=True, comment="套件描述")
+    created_by = Column(Integer, nullable=True, comment="创建人")
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+# 套件与用例的关联表
+class SuiteCase(Base):
+    __tablename__ = "suite_cases"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    suite_id = Column(Integer, ForeignKey("case_suites.id", ondelete="CASCADE"), nullable=False, index=True, comment="套件ID")
+    case_id = Column(Integer, ForeignKey("test_cases.id", ondelete="CASCADE"), nullable=False, index=True, comment="用例ID")
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (
+        UniqueConstraint("suite_id", "case_id", name="uq_suite_case"),
+    )
