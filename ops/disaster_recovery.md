@@ -41,12 +41,17 @@ bash /opt/testtask/ops/offsite_backup.sh
 bash /opt/testtask/ops/offsite_backup.sh --with-image
 ```
 
-加定时任务（每天 2:00 常规，每周日 3:00 带镜像）：
-```bash
-crontab -e
-0 2 * * * bash /opt/testtask/ops/offsite_backup.sh >> /var/log/testtask_backup.log 2>&1
-0 3 * * 0 bash /opt/testtask/ops/offsite_backup.sh --with-image >> /var/log/testtask_backup.log 2>&1
+**2026-09-11 已在生产机装好 crontab**（`crontab -l` 可查）：
+```cron
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+# 每 2 小时整点：常规备份（db + 附件 + 源码 + 配置）
+0 */2 * * * bash /opt/testtask/ops/offsite_backup.sh >> /var/log/testtask_backup.log 2>&1
+# 每周日 03:30：连 docker 镜像一起备
+30 3 * * 0 bash /opt/testtask/ops/offsite_backup.sh --with-image >> /var/log/testtask_backup.log 2>&1
 ```
+- 备份方向：**生产 192.2.100.30 → 备份机 root@192.2.56.76:/opt/testtask-backups**
+- 日志：`/var/log/testtask_backup.log`；检查是否真在跑：`ls -lt /opt/testtask-backups/`
+- 想更密（RPO 更小）就把 `0 */2 * * *` 改成 `0 * * * *`（每小时）
 
 > 远端默认保留最近 10 份包 + 3 份镜像，自动清理。
 
@@ -142,8 +147,19 @@ curl -s -o /dev/null -w "%{http_code}" http://localhost:8888/docs   # 应为 200
 
 | 指标 | 当前能力 | 说明 |
 |---|---|---|
-| **RPO**（最多丢多少数据） | 最多 **24 小时**（每天 2:00 备份） | 想更小就把 crontab 改成每小时 |
+| **RPO**（最多丢多少数据） | **最多 2 小时**（每 2 小时备份一次） | 想更小改 crontab 为每小时；要**接近 0** 必须上 PostgreSQL 流复制（见下） |
 | **RTO**（多久能恢复） | **15-30 分钟** | 有镜像包 ≈ 15 分钟；需要现拉镜像则看网速，可能 1 小时+ |
+
+### ⚠️ 关于「0 数据丢失」——现在的方案做不到
+
+备份是**时间点快照**，不是实时复制：
+
+- 故障发生在两次备份之间 → **这段时间的改动会丢**（现在最多丢 2 小时）
+- 例：16:00 备份完，17:50 宕机 → 16:00~17:50 之间新建/修改的任务、上传的附件全部丢失
+
+要真正做到接近 0 丢失，只有一条路：**PostgreSQL 主从流复制**（生产主库 → 192.2.56.76 备库，实时同步）。
+代价：需要改 compose、初始化备库、备库长期占资源，且要决定故障时是否自动切主。
+当前是**单机单库**，没有复制 —— 如果业务上真的一分钟数据都不能丢，那这个要做，可以另开一次改动来搞。
 
 ---
 
