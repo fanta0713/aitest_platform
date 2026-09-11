@@ -36,15 +36,19 @@
 2. **本地自检**
    - 前端：抽出 `<script>` 跑 `node --check`（必做，一次能避免整页白屏）
    - 后端：本地能 `python -c "import app.main"` 最好，至少确认改动文件语法 OK
-3. **上预发**（L2 及以上必做）
+3. **上预发**（L2 及以上必做）—— 预发是独立机器 **192.2.56.76**（root / 123），访问 http://192.2.56.76:8888
    ```bash
-   bash /opt/testtask/ops/setup_staging.sh     # 首次搭建/刷新，之后访问 http://192.2.100.30:8899
-   bash /opt/testtask/ops/deploy_frontend.sh /tmp/deploy/index.html staging
-   bash /opt/testtask/ops/deploy_backend.sh app/api/xxx.py staging
+   # 3.1 先把生产当前代码刷到预发，保证预发起点的生产一致
+   bash /opt/testtask/ops/refresh_staging.sh
+   # 3.2 再把这次的改动同步到预发（在预发机上发布，或让助手推过去）
+   # 3.3 在 http://192.2.56.76:8888 点一遍（含回归，不只是新功能）
    ```
-4. **上生产**
-   - 前端：`bash /opt/testtask/ops/deploy_frontend.sh /tmp/deploy/index.html`（自动备份 + 原子替换）
-   - 后端：`bash /opt/testtask/ops/deploy_backend.sh app/api/xxx.py`（自动备份容器代码 → 拷入 → import 自检 → 重启 → 健康检查，失败自动回滚）
+4. **上生产**（验证通过后，挑个方便的时间）
+   - **推荐一键同步**：`bash /opt/testtask/ops/sync_staging_to_prod.sh`
+     （自动 diff 预发/生产代码 → 只发布差异文件 → 走自检 + 自动回滚；先看差异可以加 `--dry-run`）
+   - 或者手动发：
+     - 前端：`bash /opt/testtask/ops/deploy_frontend.sh /tmp/deploy/index.html`
+     - 后端：`bash /opt/testtask/ops/deploy_backend.sh app/api/xxx.py`
    - **L3/L4 尽量放在 12:00-12:30 或 18:00 后**
 5. **验证 + 留观** 主要页面点一遍，检查 `docker logs --tail=50 testtask-backend` 无异常
 6. **出问题立刻回滚**（见下）
@@ -113,10 +117,32 @@ docker compose up -d --build
 
 ## 七、日常改动最小清单（贴墙版）
 
-- [ ] 改前：`ops/backup.sh`（DB）+ 前端自动备份
+- [ ] 改代码（落在 git 里，别在预发现场改）
 - [ ] 前端：`node --check` 抽取 `<script>` 校验
-- [ ] L2+：先上 8899 预发点一遍
-- [ ] 后端：拷入后 `docker exec python -c "import app.main"` 自检，失败不重启
-- [ ] L3/L4：放低峰时段
+- [ ] `refresh_staging.sh` 把生产代码刷到预发 → 再把自己的改动发到预发
+- [ ] 在 http://192.2.56.76:8888 点一遍（**含回归**）
+- [ ] 验证通过 → `sync_staging_to_prod.sh --dry-run` 看差异 → 去掉参数正式同步
+- [ ] L3/L4：放低峰时段（12:00-12:30 / 18:00 后）
 - [ ] 改后：主流程点一遍 + 看日志 + 留观 10 分钟
 - [ ] 出问题：立刻 `rollback_frontend.sh` / 恢复 app 备份
+
+## 八、预发环境档案（2026-09-11 建成）
+
+| 项 | 值 |
+|---|---|
+| 机器 | **192.2.56.76**（Ubuntu 22.04，root / 123，128 核 881G 内存，50G 可用磁盘） |
+| 目录 | `/opt/testtask`（与生产同构） |
+| 地址 | http://192.2.56.76:8888 |
+| 数据库 | 独立容器 `testtask-db`，5433 端口 |
+| 数据 | 生产 `pg_dump` 灌入（10 个在用任务 / 298 用例 / 11 用户，与生产一致） |
+| 附件 | 31 个已复制到 `/opt/testtask/backend/uploads` |
+| 镜像 | 从生产 `docker save` 传过来 `docker load`（该机拉不到 Docker Hub，只能用这招） |
+| 免密 | 生产 root 的 ed25519 公钥已写入预发 `authorized_keys`，prod → staging 免密 |
+
+常用命令（**在生产机上执行**）：
+```bash
+bash /opt/testtask/ops/refresh_staging.sh              # 生产代码 -> 预发
+bash /opt/testtask/ops/refresh_staging.sh --with-data   # + 用生产最新数据重灌预发库
+bash /opt/testtask/ops/sync_staging_to_prod.sh --dry-run # 看预发与生产的差异
+bash /opt/testtask/ops/sync_staging_to_prod.sh           # 预发 -> 生产（带自检和回滚）
+```

@@ -1,4 +1,13 @@
 #!/bin/bash
+# 【已废弃，仅作参考】同机搭建预发的旧脚本
+#
+# 2026-09-11 起正式预发在独立机器 192.2.56.76（root / 123）：
+#   - 目录 /opt/testtask，端口 8888（独立机器，与生产不冲突），已是生产的完整副本
+#   - 日常用：
+#       bash /opt/testtask/ops/refresh_staging.sh             # 生产代码 -> 预发
+#       bash /opt/testtask/ops/refresh_staging.sh --with-data  # 连数据一起刷
+#       bash /opt/testtask/ops/sync_staging_to_prod.sh         # 预发验证通过 -> 生产
+# ---------------------------------------------------------------------------
 # 搭建 / 刷新预发环境（staging）
 #   - 目录：/opt/testtask-staging
 #   - 端口：8899（生产是 8888），数据库映射到 5434（不暴露也行）
