@@ -2075,7 +2075,9 @@ async function completeStep(taskId, stepId) {
   if (cfg && cfg.requireAllAssigned) {
     const assignments = step.ext_data?.case_assignments || {};
     const total = linkedCasesCache.length;
-    const assigned = Object.keys(assignments).length;
+    // 只统计「指向当前已关联用例」的指派，排除孤儿/历史残留 link（如其他任务的 case）
+    const validIds = new Set(linkedCasesCache.map(x => String(x.id)));
+    const assigned = Object.keys(assignments).filter(k => validIds.has(k)).length;
     if (!total) {
       toast('该任务未关联用例，请先在「测试设计」环节关联用例', true); return;
     }
@@ -3549,8 +3551,7 @@ function step7CaseRow(c, assignments, canEdit, taskId, stepId) {
   const statusBadge = status
     ? `<span class="badge ${status === 'pass' ? 'badge-green' : status === 'fail' ? 'badge-red' : 'badge-amber'}" style="font-size:11px">${{pass:'通过',fail:'失败',block:'阻塞',na:'不支持'}[status]}</span>`
     : '<span class="badge badge-gray" style="font-size:11px">待执行</span>';
-  const isMyCase = canEdit && assignedUid && parseInt(assignedUid) === currentUser.id;
-  const opLabel = isMyCase ? '▶ 执行' : '👁 查看';
+  const opLabel = canEdit ? '▶ 执行' : '👁 查看';
   const pri = parseInt(c.priority) || 3;
   const priClass = p => p === 1 ? 'badge-red' : p === 2 ? 'badge-amber' : 'badge-blue';
   return `<div style="display:flex;align-items:center;gap:8px;padding:6px 16px;border-bottom:1px solid var(--border);font-size:13px;background:#fff">
@@ -3757,12 +3758,17 @@ async function saveExecManage() {
 function openCaseExecModal(taskId, linkId, stepId, canEdit) {
   const c = linkedCasesCache.find(x => x.id === linkId);
   if (!c) { toast('用例数据不存在，请刷新页面重试', true); return; }
-  // 权限校验：只有被分配给自己的用例才能编辑（admin 也不例外，需先分配给自己）
+  // 权限校验：步骤7执行测试，任务的测试执行人（主执行人 + executors 列表）可对任一用例执行；
+  // 逐条用例指派(步骤6)降级为"负责人"标识，不再作为硬性编辑门槛（避免执行人被自己的任务锁死）
   const step6 = stepCache.find(s => s.step === 6);
   const assignments = (step6?.ext_data?.case_assignments) || {};
   const assignedUid = assignments[String(c.id)] || assignments[c.id];
   const isAssignedToMe = assignedUid && parseInt(assignedUid) === currentUser.id;
-  const finalCanEdit = canEdit && isAssignedToMe;
+  const isStep7Executor = currentTask && (
+    currentTask.executor_id === currentUser.id ||
+    (currentTask.executors || []).some(e => e.user_id === currentUser.id)
+  );
+  const finalCanEdit = canEdit && (isAssignedToMe || isStep7Executor);
   // pendingResults: 本次弹窗内的临时编辑结果，确认时才提交；关闭/取消则丢弃
   const initialResults = (c.latest_result && Array.isArray(c.latest_result.step_results))
     ? JSON.parse(JSON.stringify(c.latest_result.step_results))
