@@ -337,7 +337,8 @@ class TaskService:
         """当前环节回退至上一环节（修订模式：业务数据保留，只动流程状态）
 
         权限：仅当前环节负责人（步骤7含 executors 全体执行人）；PL 特权已取消
-        约束：只能回退当前环节；步骤5/9 有专属的"不通过打回"规则、步骤10 为终态，不走本通道
+        约束：只能回退当前环节；步骤9 有专属的"需补测打回"规则（双审核）、步骤10 为终态，不走本通道
+        （步骤5 已并入手动回退——通过与否以"提交到下一环节/返回上一环节"表达，审核意见记入处理说明）
         原因必填，落两处（全流程可追溯）：
           1) 目标环节 remark 就地标注，2) 操作历史(action=step_rollback)
         """
@@ -354,8 +355,8 @@ class TaskService:
             raise ValueError("环节不存在或不属于该任务")
         if step.step != task.current_step:
             raise ValueError("只能回退当前环节")
-        if step.step in (5, 9):
-            raise ValueError(f"步骤{step.step}请使用既有的『不通过打回』流程")
+        if step.step == 9:
+            raise ValueError("步骤9请使用既有的『需补测』打回流程（数据审核双人复核）")
         if step.step <= 2:
             raise ValueError("当前环节没有可回退的上一步")
 

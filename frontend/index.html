@@ -1876,10 +1876,7 @@ const STEP_FORMS = {
     { key: 'cpu', label: 'CPU', full: true },
     { key: 'memory', label: '内存' }, { key: 'ip', label: '测试环境IP' },
   ]},
-  5: { criteria: '审核通过给出意见可下行，否则打回（打回将退回环节4环境确认重做）', fields: [
-    { key: 'review_result', label: '审核结果', type: 'select', options: [['pass','通过'],['reject','打回（退回环境确认）']] },
-    { key: 'review_comment', label: '审核意见', type: 'textarea', full: true },
-  ]},
+  5: { criteria: '环境审核：通过则选「提交到下一环节」并可在处理说明中写明审核意见；不通过则选「返回上一环节」打回（将退回环节4环境确认重做）。通过与否随处理记录归档' },
   6: { criteria: '版本负责人将关联用例分配给具体测试执行人，每个用例必须指定执行人（全部分配后才能完成本环节）', case_assign: true, requireAllAssigned: true },
   7: { criteria: '按用例执行测试，记录结果。所有用例必须有测试结果（通过/失败/阻塞/不支持）才能进入下一环节', requireAllTested: true },
   8: { criteria: '测试报告、测试过程log链接、自动化工具结果（均为必填）', fields: [
@@ -1908,6 +1905,14 @@ function renderStepForm(s, taskId, isCurrent, canOperate) {
     </div>`;
   }
   let html = `<div class="step-criteria">📋 准出条件：${cfg.criteria}</div>`;
+  // 历史回显：全步骤——「处理方式·处理说明」与步骤5存量审核记录（修订模式下的可追溯读取端）
+  if (isDone || !isCurrent) {
+    if (data.handle_note) html += `<div class="step-readonly"><span class="kv">📝 处理说明：<b>${esc(data.handle_note)}</b></span></div>`;
+    if (s.step === 5 && (data.review_result || data.review_comment)) {
+      const verdict = data.review_result === 'pass' ? '✅ 通过' : (data.review_result ? '↩ 打回' : '');
+      html += `<div class="step-readonly"><span class="kv">沿革·审核记录：${verdict}${data.review_comment ? ' · ' + esc(data.review_comment) : ''}</span></div>`;
+    }
+  }
   // 非当前环节或已完成的环节 → 字段只读
   const fieldReadOnly = (isDone || !isCurrent || !canOperate) ? 'disabled' : '';
   // 数据审核双审核模式（PL + TSE 各自审核，都通过后才能下行）
@@ -1986,45 +1991,45 @@ function renderStepForm(s, taskId, isCurrent, canOperate) {
   }
   // 操作按钮：只有当前环节 + 未完成 + 有权限 → 才显示
   if (!isDone) {
-    // 「处理方式」卡（环节3/4/6/7/8）：像环节5的审核结论一样统一提交出口
+    // 「处理方式」区（环节3/4/5/6/7/8）：与全站表单同款视觉（step-form 白底网格），
+    // 步骤5的"审核结果"选择器已并进来——通过与否 = 选「提交到下一环节」或「返回上一环节」，
+    // 审核意见写在处理说明里，随本环节记录归档并可在历史中回看。
     // 「提交到下一环节」复用 completeStep 全链校验；「返回上一环节」原因必填走 rollback API
-    // 权限：仅环节负责人（canOperate 即可，PL 特权已取消——PL不是本环节负责人就只能看）
-    // 环节2/5/9/10 维持专属交互：5/9各有审核结论+打回链、2无可回退上一步、10为终态
-    const HD_STEPS = [3, 4, 6, 7, 8];
+    // 权限：仅环节负责人（canOperate；PL 特权已取消）
+    // 环节2/9/10 维持专属交互：2无可回退上一步、9双审核各有结论+补测打回链、10终态
+    const HD_STEPS = [3, 4, 5, 6, 7, 8];
     if (isCurrent && canOperate && HD_STEPS.includes(s.step)) {
       let warn = '';
       if (s.step === 7 && Array.isArray(linkedCasesCache)) {
         const doneCnt = linkedCasesCache.filter(c => c.latest_result).length;
         if (doneCnt) warn = `<div style="margin-top:6px;padding:6px 10px;background:#fef9c3;border-radius:6px;font-size:12px">⚠️ 本环节已有 <b>${doneCnt}</b> 条用例执行结果，回退后<b>不会被清除</b>；调整用例分配后请自行复核一致性。</div>`;
       }
-      html += `<div style="border:1px solid var(--border);border-radius:10px;padding:12px 16px;margin-top:14px;background:#f8fafc" id="hdCard_${s.id}">
-        <b style="font-size:13px">处理方式</b>
-        <div style="display:flex;gap:10px;align-items:center;margin-top:8px;flex-wrap:wrap">
-          <select id="hd_sel_${s.id}" onchange="onHandleModeChange(${s.id})" style="min-width:300px">
+      const notePh = s.step === 5 ? '例如：环境满足测试条件，同意下行（通过与否以上方选择为准）' : '补充说明，可留空';
+      html += `<div class="step-form" style="margin-top:10px" id="hdCard_${s.id}">
+        <div class="full"><label>处理方式</label>
+          <select id="hd_sel_${s.id}" onchange="onHandleModeChange(${s.id})">
             <option value="next">提交到下一环节（步骤${s.step + 1}・${esc(STEP_NAMES[s.step] || '')}）</option>
             <option value="back">返回上一环节（步骤${s.step - 1}・${esc(STEP_NAMES[s.step - 2] || '')}）</option>
           </select>
-          ${cfg.fields ? `<button class="btn btn-sm" onclick="saveStepData(${taskId}, ${s.id})">💾 保存数据</button>` : ''}
-          <button class="btn btn-sm btn-primary" onclick="hdSubmit(${taskId}, ${s.id}, ${s.step})">✓ 提交处理</button>
         </div>
-        <div id="hd_back_${s.id}" style="margin-top:8px;display:none">
-          <label style="font-size:12px;font-weight:600">回退原因<span style="color:var(--danger)">（必填，将记入操作历史）</span></label>
-          <textarea id="hd_reason_${s.id}" rows="2" style="width:100%;margin-top:4px" placeholder="例如：测试设计遗漏关键场景，需补充用例后再执行"></textarea>
+        <div class="full" id="hd_next_${s.id}">
+          <label>处理说明（选填，随本环节记录归档并可在历史中回看）</label>
+          <textarea id="hd_note_${s.id}" rows="2" placeholder="${notePh}"></textarea>
+        </div>
+        <div class="full" id="hd_back_${s.id}" style="display:none">
+          <label>回退原因<span style="color:var(--danger)">（必填，将记入操作历史）</span></label>
+          <textarea id="hd_reason_${s.id}" rows="2" placeholder="例如：测试设计遗漏关键场景，需补充用例后再执行"></textarea>
           ${warn}
         </div>
-        <div id="hd_next_${s.id}" style="margin-top:8px">
-          <label style="font-size:12px;font-weight:600">处理说明（选填，随本环节完成记录归档）</label>
-          <textarea id="hd_note_${s.id}" rows="2" style="width:100%;margin-top:4px" placeholder="补充说明，可留空"></textarea>
+        <div class="full" style="text-align:right">
+          ${cfg.fields ? `<button class="btn btn-sm" onclick="saveStepData(${taskId}, ${s.id})">💾 保存数据</button>` : ''}
+          <button class="btn btn-sm btn-primary" onclick="hdSubmit(${taskId}, ${s.id}, ${s.step})">✓ 提交处理</button>
         </div>
       </div>`;
     } else if (isCurrent && canOperate) {
       html += `<div class="step-actions">`;
       if (cfg.fields) html += `<button class="btn btn-sm" onclick="saveStepData(${taskId}, ${s.id})">💾 保存数据</button>`;
-      if (s.step === 5) {
-        html += `<button class="btn btn-sm btn-primary" onclick="submitReviewStep(${taskId}, ${s.id}, ${s.step})">提交审核</button>`;
-      } else if (s.step <= 8 || s.step === 10) {
-        html += `<button class="btn btn-sm btn-primary" onclick="completeStep(${taskId}, ${s.id})">✓ 完成本环节</button>`;
-      }
+      html += `<button class="btn btn-sm btn-primary" onclick="completeStep(${taskId}, ${s.id})">✓ 完成本环节</button>`;
       html += `</div>`;
     } else if (!isCurrent) {
       html += `<div class="step-actions"><span class="muted" style="font-size:12px;padding:6px 0">⏸ 非当前环节，仅查看</span></div>`;
@@ -2217,26 +2222,6 @@ async function saveDualReview(taskId, stepId) {
     await api(`/api/tasks/${taskId}/steps/${stepId}`, { method: 'PUT', body: { ext_data: merged } });
     step.ext_data = merged;
     toast('审核结果已保存');
-  } catch (e) { toast(e.message, true); }
-}
-
-async function submitReviewStep(taskId, stepId, stepNo) {
-  const step = stepCache.find(s => s.id === stepId);
-  if (!step) return;
-  const extData = collectStepData(stepId, stepNo);
-  const decisionKey = stepNo === 5 ? 'review_result' : 'conclusion';
-  const decision = extData[decisionKey];
-  if (!decision) { toast('请选择审核结果', true); return; }
-  // 先保存数据
-  try {
-    await api(`/api/tasks/${taskId}/steps/${stepId}`, { method: 'PUT', body: { ext_data: extData } });
-  } catch (e) { toast(e.message, true); return; }
-  // 通过→completed, 不通过→rejected（后端会处理回退逻辑）
-  const status = decision === 'pass' ? 'completed' : 'rejected';
-  try {
-    const result = await api(`/api/tasks/${taskId}/steps/${stepId}`, { method: 'PUT', body: { status, remark: extData.remark || extData.review_comment || '' } });
-    toast(stepNo === 5 && decision === 'reject' ? '已打回，环境确认环节重新处理' : (stepNo === 9 && decision === 'retest' ? '需补测，退回环节8（测试完成）由版本负责人组织补测' : '审核已通过'));
-    openTask(taskId);
   } catch (e) { toast(e.message, true); }
 }
 
