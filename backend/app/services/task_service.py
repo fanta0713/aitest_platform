@@ -336,7 +336,7 @@ class TaskService:
     ) -> TaskStep:
         """当前环节回退至上一环节（修订模式：业务数据保留，只动流程状态）
 
-        权限：任务owner(PL) 或 当前环节负责人（步骤7含 executors 全体执行人）
+        权限：仅当前环节负责人（步骤7含 executors 全体执行人）；PL 特权已取消
         约束：只能回退当前环节；步骤5/9 有专属的"不通过打回"规则、步骤10 为终态，不走本通道
         原因必填，落两处（全流程可追溯）：
           1) 目标环节 remark 就地标注，2) 操作历史(action=step_rollback)
@@ -359,8 +359,7 @@ class TaskService:
         if step.step <= 2:
             raise ValueError("当前环节没有可回退的上一步")
 
-        # 权限：PL(owner) 或 当前环节负责人
-        is_owner = (task.owner == user_id)
+        # 权限：仅当前环节负责人（PL 特权已取消——PL 名下环节与其他角色同权，按 assigned_to 认定）
         is_cur_assignee = (step.assigned_to == user_id) or (step.assigned_to is None)
         if step.step == 7:
             executor_ids = set()
@@ -372,8 +371,8 @@ class TaskService:
                         executor_ids.add(int(e['user_id']))
             if user_id in executor_ids:
                 is_cur_assignee = True
-        if not (is_owner or is_cur_assignee):
-            raise PermissionError("仅 PL 或当前环节负责人可回退")
+        if not is_cur_assignee:
+            raise PermissionError("仅当前环节负责人可回退")
 
         prev_step_no = step.step - 1
         prev = (await self.db.execute(

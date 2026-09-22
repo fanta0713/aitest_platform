@@ -1988,12 +1988,10 @@ function renderStepForm(s, taskId, isCurrent, canOperate) {
   if (!isDone) {
     // 「处理方式」卡（环节3/4/6/7/8）：像环节5的审核结论一样统一提交出口
     // 「提交到下一环节」复用 completeStep 全链校验；「返回上一环节」原因必填走 rollback API
-    // 权限：环节负责人可双选；PL(owner) 无本环节编辑权时仅可发起回退（延续已定权限）
+    // 权限：仅环节负责人（canOperate 即可，PL 特权已取消——PL不是本环节负责人就只能看）
     // 环节2/5/9/10 维持专属交互：5/9各有审核结论+打回链、2无可回退上一步、10为终态
     const HD_STEPS = [3, 4, 6, 7, 8];
-    const isPl = currentTask && currentTask.owner === currentUser.id;
-    if (isCurrent && (canOperate || isPl) && HD_STEPS.includes(s.step)) {
-      const allowNext = !!canOperate;
+    if (isCurrent && canOperate && HD_STEPS.includes(s.step)) {
       let warn = '';
       if (s.step === 7 && Array.isArray(linkedCasesCache)) {
         const doneCnt = linkedCasesCache.filter(c => c.latest_result).length;
@@ -2003,21 +2001,21 @@ function renderStepForm(s, taskId, isCurrent, canOperate) {
         <b style="font-size:13px">处理方式</b>
         <div style="display:flex;gap:10px;align-items:center;margin-top:8px;flex-wrap:wrap">
           <select id="hd_sel_${s.id}" onchange="onHandleModeChange(${s.id})" style="min-width:300px">
-            ${allowNext ? `<option value="next">提交到下一环节（步骤${s.step + 1}・${esc(STEP_NAMES[s.step] || '')}）</option>` : ''}
-            <option value="back" ${allowNext ? '' : 'selected'}>返回上一环节（步骤${s.step - 1}・${esc(STEP_NAMES[s.step - 2] || '')}）</option>
+            <option value="next">提交到下一环节（步骤${s.step + 1}・${esc(STEP_NAMES[s.step] || '')}）</option>
+            <option value="back">返回上一环节（步骤${s.step - 1}・${esc(STEP_NAMES[s.step - 2] || '')}）</option>
           </select>
-          ${canOperate && cfg.fields ? `<button class="btn btn-sm" onclick="saveStepData(${taskId}, ${s.id})">💾 保存数据</button>` : ''}
+          ${cfg.fields ? `<button class="btn btn-sm" onclick="saveStepData(${taskId}, ${s.id})">💾 保存数据</button>` : ''}
           <button class="btn btn-sm btn-primary" onclick="hdSubmit(${taskId}, ${s.id}, ${s.step})">✓ 提交处理</button>
         </div>
-        <div id="hd_back_${s.id}" style="margin-top:8px;${allowNext ? 'display:none' : ''}">
+        <div id="hd_back_${s.id}" style="margin-top:8px;display:none">
           <label style="font-size:12px;font-weight:600">回退原因<span style="color:var(--danger)">（必填，将记入操作历史）</span></label>
           <textarea id="hd_reason_${s.id}" rows="2" style="width:100%;margin-top:4px" placeholder="例如：测试设计遗漏关键场景，需补充用例后再执行"></textarea>
           ${warn}
         </div>
-        ${allowNext ? `<div id="hd_next_${s.id}" style="margin-top:8px">
+        <div id="hd_next_${s.id}" style="margin-top:8px">
           <label style="font-size:12px;font-weight:600">处理说明（选填，随本环节完成记录归档）</label>
           <textarea id="hd_note_${s.id}" rows="2" style="width:100%;margin-top:4px" placeholder="补充说明，可留空"></textarea>
-        </div>` : ''}
+        </div>
       </div>`;
     } else if (isCurrent && canOperate) {
       html += `<div class="step-actions">`;
