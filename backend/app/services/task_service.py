@@ -412,7 +412,8 @@ class TaskService:
         事实，按既有约定仅在任务字段改动时级联重铺步骤负责人。
         开放范围即"非PL环节"：1/2为PL环节、9为双人共审(owner∪tse，见
         list_tasks pending 特判与前端对应特判)、10为终态，均不开放。
-        已完成环节亦可改派(订正历史)，归责过程在操作历史中新旧双名俱全。
+        已完成(completed)环节不做改派；rejected(被打回待处理)保留可改派
+        (打回即换人重来的场景)。审计动作 step_reassign 新旧双名俱全。
         """
         task = await self.get_task(task_id)
         if not task:
@@ -429,6 +430,10 @@ class TaskService:
             raise ValueError("环节不存在或不属于该任务")
         if step.step in (1, 2, 9, 10):
             raise ValueError(f"环节{step.step}为PL/双人共审/终态环节，不开放改派(仅3-8)")
+        # 已完成环节不做改派（2026-09-22 用户约定：都完成了还改什么）；
+        # rejected（被打回待处理）保留可改派——打回本就是"换人重来"的场景
+        if step.status == StepStatus.completed.value:
+            raise ValueError(f"环节{step.step}「{step.step_name}」已完成，无需改派")
 
         new_user = (await self.db.execute(select(User).where(User.id == new_uid))).scalar_one_or_none()
         if not new_user:

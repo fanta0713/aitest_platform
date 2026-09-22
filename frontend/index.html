@@ -1929,12 +1929,15 @@ function renderStepForm(s, taskId, isCurrent, canOperate) {
     ).join('');
     const isAdminFe = currentUser && ((currentUser.roles || []).concat(currentUser.role ? [currentUser.role] : [])).includes('admin');
     const isPlFe = currentUser && currentTask && (currentTask.owner === currentUser.id || isAdminFe);
+    // 已完成环节(completed)不做改派(用户约定2026-09-22)，控件仅 PL 对未完成环节渲染；
+    // rejected(被打回待处理)仍开放——打回本就是换人重来的场景；后端同规则硬校验(400)
+    const raEditable = !isDone && isPlFe;
     html += `<div class="step-readonly" style="margin-top:10px;align-items:center">
       <span class="kv">👤 环节负责人：<b>${esc(anTxt) || '待指派'}</b></span>
-      ${isPlFe ? `<span style="display:inline-flex;gap:6px;align-items:center">
+      ${raEditable ? `<span style="display:inline-flex;gap:6px;align-items:center">
         <select id="sa_sel_${s.id}" style="font-size:12px;padding:3px 6px;border:1px solid var(--border);border-radius:6px;background:#fff">${saOpts}</select>
         <button class="btn btn-sm" onclick="reassignStep(${taskId}, ${s.id}, ${s.step})">🔧 改派</button>
-      </span>` : ''}
+      </span>${'' /* completed 环节只读姓名，与后端"已完成无需改派"呼应 */}` : ''}
     </div>`;
   }
   // 历史回显：全步骤——「处理方式·处理说明」与步骤5存量审核记录（修订模式下的可追溯读取端）
