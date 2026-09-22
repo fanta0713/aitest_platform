@@ -57,7 +57,15 @@ async def list_tasks(
     tasks, total = await service.get_tasks(status=status, owner=owner, limit=limit, offset=offset)
     # pending过滤：只返回当前环节分配给自己的任务，已完成的任务不再挂人名下
     if pending:
-        tasks = [t for t in tasks if t.status != 'done' and t.current_step_assignee == current_user.id]
+        def _is_my_turn(t):
+            if t.status == 'done':
+                return False
+            if t.current_step == 9:
+                # 数据审核为 PL+TSE 双人共审（task_steps.assigned_to=None，单人字段
+                # 表达不了两人），PL/TSE 任一人的"待我处理"都必须出现(2026-09-22 用户反馈)
+                return current_user.id in (t.owner, t.tse_id)
+            return t.current_step_assignee == current_user.id
+        tasks = [t for t in tasks if _is_my_turn(t)]
         total = len(tasks)
     # 加载每个任务的 current_step_name（从 task_steps 查），避免流程改造后步骤名错位
     task_ids = [t.id for t in tasks]

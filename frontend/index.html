@@ -1348,9 +1348,15 @@ async function loadMyTasks(mode = 'pending') {
       const data = await api('/api/tasks?mine=true&pending=true');
       tasks = data.items;
     } else {
-      // 我已处理：我参与但当前环节不归我
+      // 我已处理：我参与但当前不轮到我处理（数据审核环节9为 PL+TSE 双人共审，
+      // current_step_assignee 为空，与后端 pending 过滤同样的特判保持两页互斥完备）
       const allData = await api('/api/tasks?mine=true');
-      tasks = allData.items.filter(t => t.current_step_assignee !== currentUser.id);
+      tasks = allData.items.filter(t => {
+        const isDone = t.status === 'done' || t.current_step === 10;
+        const waitingMe = !isDone && (t.current_step_assignee === currentUser.id ||
+          (t.current_step === 9 && (t.owner === currentUser.id || t.tse_id === currentUser.id)));
+        return !waitingMe;
+      });
     }
     document.getElementById('myTasksEmpty').style.display = tasks.length ? 'none' : 'block';
     document.getElementById('myTasksBody').innerHTML = tasks.map(t => {
