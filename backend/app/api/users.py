@@ -125,11 +125,12 @@ async def delete_user(
         raise HTTPException(status_code=404, detail="用户不存在")
     if user.account == "admin":
         raise HTTPException(status_code=400, detail="管理员账号不可删除")
-    # 检查是否有关联测试任务
+    # 检查是否有关联测试任务（只统计未删除的任务，软删除不算）
     task_cnt = (await db.execute(
         select(func.count(TestTask.id)).where(
-            (TestTask.owner == user_id) | (TestTask.tse_id == user_id) |
-            (TestTask.version_owner == user_id) | (TestTask.executor_id == user_id)
+            ((TestTask.owner == user_id) | (TestTask.tse_id == user_id) |
+            (TestTask.version_owner == user_id) | (TestTask.executor_id == user_id))
+            & (TestTask.deleted == False)
         )
     )).scalar()
     if task_cnt > 0:
