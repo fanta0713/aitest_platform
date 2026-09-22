@@ -9,7 +9,7 @@ from datetime import datetime
 from app.models.models import (
     TestTask, TaskStep, TaskIssue, TaskAction,
     TaskStatus, StepStatus, IssueStatus,
-    User, Project, Product, TaskCaseLink
+    User, Project, Product, TaskCaseLink, ProjectMember
 )
 from app.schemas.schemas import (
     TaskCreate, TaskUpdate, TaskStepUpdate, IssueCreate, IssueUpdate,
@@ -32,6 +32,27 @@ FLOW_STEPS = [
     {"step": 9, "name": "数据审核", "type": "review", "roles": ["version", "tse"]},
     {"step": 10, "name": "任务结束", "type": "end", "roles": ["pl"]},
 ]
+
+# 改派级联映射（环节号 → 任务级角色字段, 中文名）：与建任务初始化 owner_map 同源。
+# 3/4/6/8 ← version_owner；7 ← executor_id；5 ← owner(PL)。
+# 流程含义：环境审核(5)只有PL有权；7是任务主执行人(executor_id)；8测试完成归版本负责人汇总。
+CASCADE_FIELD = {
+    3: ("version_owner", "版本负责人"),
+    4: ("version_owner", "版本负责人"),
+    6: ("version_owner", "版本负责人"),
+    8: ("version_owner", "版本负责人"),
+    7: ("executor_id", "测试执行人"),
+    5: ("owner", "PL负责人"),
+}
+
+# 环节家族 ↔ 项目角色(project_role)：改派候选人资格的唯一口径（2026-09-22 需求1/2）。
+# 与 CASCADE_FIELD 家族一一同源——改出去的人必然同时合法占据对应"任务级角色字段"，
+# 环节资格与级联同步永不打架。
+FAMILY_PROJECT_ROLE = {
+    "version_owner": ("version_owner", "版本负责人"),
+    "executor_id": ("executor", "测试执行人"),
+    "owner": ("pl", "PL（项目负责人）"),
+}
 
 
 class TaskService:
@@ -417,6 +438,9 @@ class TaskService:
         list_tasks pending 特判与前端对应特判)、10为终态，均不开放。
         已完成(completed)环节不做改派；rejected(被打回待处理)保留可改派
         (打回即换人重来的场景)。审计动作 step_reassign 记新旧双名+级联说明。
+        候选资格（2026-09-22 需求1/2）：目标责任人须持有该环节所属家族的项目角色
+        （3/4/6/8→version_owner、7→executor、5→pl，环境审核因此仅PL）；
+        任务未挂项目或项目该角色无在编成员时放行兜底。
         """
         task = await self.get_task(task_id)
         if not task:
@@ -446,6 +470,26 @@ class TaskService:
         if step.assigned_to == new_uid:
             raise ValueError("所选用户已经是该环节的责任人")
 
+        # 改派资格（2026-09-22 需求："改派只展示/允许有当前环节权限的人"+“环境审核只有PL”）：
+        # 目标责任人必须持有该环节所属 CASCADE 家族对应的项目角色（3/4/6/8→版本负责人、
+        # 7→测试执行、5→PL）。兜底——任务未挂项目、或项目里该角色尚无在编成员时不设卡，
+        # 可用性优先（与前端"过滤后为空则维持全量列表"同一口径）。
+        fam_pair = CASCADE_FIELD.get(step.step)
+        if fam_pair and task.project_id:
+            spr, spr_zh = FAMILY_PROJECT_ROLE[fam_pair[0]]
+            holder_rows = (await self.db.execute(
+                select(ProjectMember.user_id).where(
+                    ProjectMember.project_id == task.project_id,
+                    ProjectMember.project_role == spr,
+                )
+            )).scalars().all()
+            holder_set = set(holder_rows)
+            if holder_set and new_uid not in holder_set:
+                raise ValueError(
+                    f"环节{step.step}「{step.step_name}」仅限项目角色「{spr_zh}」担任，"
+                    f"{new_user.realname or new_user.account} 未持该角色"
+                )
+
         # 一次取齐新旧姓名用于留痕（旧负责人可为空 → 待指派）
         ids = [i for i in {step.assigned_to, new_uid} if i]
         names: dict = {}
@@ -464,16 +508,8 @@ class TaskService:
         # 级联回写任务级角色字段（2026-09-22 用户反馈：改派后标题栏没变化——
         # 详情页头部的「版本负责人/测试执行人/PL」横幅读的是任务级字段，
         # 只改步骤行会造成两层撕裂；需求原话"同步到任务状态"即指此）。
-        # 映射与建任务初始化 owner_map（task_service 约126行）一一对应：
-        #   3/4/6/8 ← version_owner；7 ← executor_id；5 ← owner
-        CASCADE_FIELD = {
-            3: ("version_owner", "版本负责人"),
-            4: ("version_owner", "版本负责人"),
-            6: ("version_owner", "版本负责人"),
-            8: ("version_owner", "版本负责人"),
-            7: ("executor_id", "测试执行人"),
-            5: ("owner", "PL负责人"),
-        }
+        # 映射见模块级 CASCADE_FIELD（task_service 顶部）：3/4/6/8 ← version_owner；
+        # 7 ← executor_id；5 ← owner。家族↔项目角色见 FAMILY_PROJECT_ROLE。
         sync_note = ""
         pair = CASCADE_FIELD.get(step.step)
         if pair:

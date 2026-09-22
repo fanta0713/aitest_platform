@@ -1903,6 +1903,52 @@ const STEP_FORMS = {
   10: { criteria: '任务归档、总结复盘' },
 };
 
+// ===== 改派候选人资格（2026-09-22 需求1/2） =====
+// 与后端 CASCADE_FIELD 家族同源：环节 → 任务级角色字段 → 项目角色(project_role)。
+// 3/4/6/8→版本负责人；7→测试执行；5(环境审核)→仅PL——"环境审核只有PL有权限"由此落地。
+const STEP_FAMILY_ROLES = {
+  3: ['version_owner'], 4: ['version_owner'], 5: ['pl'],
+  6: ['version_owner'], 7: ['executor'], 8: ['version_owner']
+};
+const STEP_ROLE_ZH = { version_owner: '版本负责人', pl: 'PL', tse: 'TSE', executor: '测试执行' };
+function projectMembersOf(pid) {
+  if (!pid) return Promise.resolve(null);
+  const hit = (projectsCache || []).find(p => String(p.id) === String(pid));
+  if (hit) return Promise.resolve(hit.members || []);
+  return api('/api/projects').then(lst => {
+    projectsCache = lst || [];
+    const pj = (projectsCache || []).find(p => String(p.id) === String(pid));
+    return pj ? (pj.members || []) : [];
+  }).catch(() => null);
+}
+function refineStepAssigneeOptions(s, members) {
+  if (!Array.isArray(members)) return;            // 拉取失败 → 维持全量列表兜底
+  const sel = document.getElementById(`sa_sel_${s.id}`);
+  if (!sel) return;                               // 视图已切换/环节已重渲染
+  const wanted = STEP_FAMILY_ROLES[s.step] || [];
+  const byId = {};
+  (usersCache || []).forEach(u => { byId[u.id] = u; });
+  const seen = new Set();
+  let opts = '';
+  (members || []).forEach(m => {
+    if (seen.has(Number(m.user_id)) || !wanted.includes(m.project_role)) return;
+    const u = byId[m.user_id];
+    if (u && u.is_active === false) return;       // 禁用成员不出现在候选里
+    seen.add(Number(m.user_id));
+    const nm = (u && (u.realname || u.account)) || m.realname || m.account;
+    const acc = (u && u.account) || m.account;
+    opts += `<option value="${m.user_id}" ${Number(m.user_id) === Number(s.assigned_to) ? 'selected' : ''}>${esc(nm)}（${esc(acc)}）</option>`;
+  });
+  // 现任负责人兜底：角色其后被收回也不至于"选中项蒸发"
+  if (s.assigned_to && !seen.has(Number(s.assigned_to))) {
+    const u = byId[s.assigned_to];
+    if (u && u.is_active !== false) {
+      opts = `<option value="${s.assigned_to}" selected>${esc(u.realname || u.account)}（${esc(u.account)}）</option>` + opts;
+    }
+  }
+  if (opts) sel.innerHTML = opts;
+}
+
 function renderStepForm(s, taskId, isCurrent, canOperate) {
   const cfg = STEP_FORMS[s.step];
   if (!cfg) return '';
@@ -1924,6 +1970,8 @@ function renderStepForm(s, taskId, isCurrent, canOperate) {
   // 服务端以 task_steps.assigned_to 为单一事实源+操作历史留痕，改派成功即整页重取全量同步
   if (s.step >= 3 && s.step <= 8) {
     const anTxt = userName(s.assigned_to);
+    // 资格徽标：该环节仅哪些项目角色可接任（3/4/6/8→版本负责人、7→测试执行、5→PL）
+    const roLbls = (STEP_FAMILY_ROLES[s.step] || []).map(r => STEP_ROLE_ZH[r]).join('/');
     const saOpts = (usersCache || []).filter(u => u.is_active !== false).map(u =>
       `<option value="${u.id}" ${u.id === s.assigned_to ? 'selected' : ''}>${esc(u.realname || u.account)}（${esc(u.account)}）</option>`
     ).join('');
@@ -1935,10 +1983,16 @@ function renderStepForm(s, taskId, isCurrent, canOperate) {
     html += `<div class="step-readonly" style="margin-top:10px;align-items:center">
       <span class="kv">👤 环节负责人：<b>${esc(anTxt) || '待指派'}</b></span>
       ${raEditable ? `<span style="display:inline-flex;gap:6px;align-items:center">
+        ${roLbls ? `<span style="font-size:11px;color:#64748b">仅限：${roLbls}</span>` : ''}
         <select id="sa_sel_${s.id}" style="font-size:12px;padding:3px 6px;border:1px solid var(--border);border-radius:6px;background:#fff">${saOpts}</select>
         <button class="btn btn-sm" onclick="reassignStep(${taskId}, ${s.id}, ${s.step})">🔧 改派</button>
       </span>${'' /* completed 环节只读姓名，与后端"已完成无需改派"呼应 */}` : ''}
     </div>`;
+    // 候选人异步收敛到"有当前环节权限"的项目成员（全量列表先行渲染，资格表到位即替换；
+    // 项目缺编/拉取失败时保底不替换，与后端放行兜底同一口径）
+    if (raEditable && currentTask && currentTask.project_id) {
+      projectMembersOf(currentTask.project_id).then(ms => refineStepAssigneeOptions(s, ms));
+    }
   }
   // 历史回显：全步骤——「处理方式·处理说明」与步骤5存量审核记录（修订模式下的可追溯读取端）
   if (isDone || !isCurrent) {
