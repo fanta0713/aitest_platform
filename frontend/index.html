@@ -1972,31 +1972,16 @@ function renderStepForm(s, taskId, isCurrent, canOperate) {
     }
     return html;
   }
-  if (cfg.fields) {
-    html += `<div class="step-form">`;
-    for (const f of cfg.fields) {
-      const val = esc(data[f.key] || '');
-      const cls = f.full ? 'full' : '';
-      if (f.type === 'textarea') {
-        html += `<div class="${cls}"><label>${f.label}</label><textarea rows="2" id="sf_${s.id}_${f.key}" ${fieldReadOnly}>${val}</textarea></div>`;
-      } else if (f.type === 'select') {
-        html += `<div class="${cls}"><label>${f.label}</label><select id="sf_${s.id}_${f.key}" ${fieldReadOnly}>`;
-        for (const [v, l] of f.options) html += `<option value="${v}" ${data[f.key] === v ? 'selected' : ''}>${l}</option>`;
-        html += `</select></div>`;
-      } else {
-        html += `<div class="${cls}"><label>${f.label}</label><input id="sf_${s.id}_${f.key}" type="${f.type || 'text'}" value="${val}" ${fieldReadOnly}></div>`;
-      }
-    }
-    html += `</div>`;
-  }
   // 操作按钮：只有当前环节 + 未完成 + 有权限 → 才显示
+  // 【固定在业务字段上方】——处理方式是本环节的"决策出口"，无论该环节有没有表单字段，
+  // 永远紧跟准出条/历史回显之后首先出现（用户反馈：步骤4的处理方式不该沉到表单底下）。
   if (!isDone) {
     // 「处理方式」区（环节3/4/5/6/7/8）：与全站表单同款视觉（step-form 白底网格），
     // 步骤5的"审核结果"选择器已并进来——通过与否 = 选「提交到下一环节」或「返回上一环节」，
     // 审核意见写在处理说明里，随本环节记录归档并可在历史中回看。
     // 「提交到下一环节」复用 completeStep 全链校验；「返回上一环节」原因必填走 rollback API
     // 权限：仅环节负责人（canOperate；PL 特权已取消）
-    // 环节2/9/10 维持专属交互：2无可回退上一步、9双审核各有结论+补测打回链、10终态
+    // 环节2/9/10 维持专属交互：2无可回退上一步、9双审核各有结论+补测打回链、10为终态
     const HD_STEPS = [3, 4, 5, 6, 7, 8];
     if (isCurrent && canOperate && HD_STEPS.includes(s.step)) {
       let warn = '';
@@ -2037,6 +2022,24 @@ function renderStepForm(s, taskId, isCurrent, canOperate) {
       const assigneeName = userName(s.assigned_to);
       html += `<div class="step-actions"><span class="muted" style="font-size:12px;padding:6px 0">🔒 该环节由 ${esc(assigneeName)} 负责，无操作权限</span></div>`;
     }
+  }
+  // 业务字段（环节2/4/8 的表单）紧随处理方式之后，作为"佐证材料"呈现
+  if (cfg.fields) {
+    html += `<div class="step-form">`;
+    for (const f of cfg.fields) {
+      const val = esc(data[f.key] || '');
+      const cls = f.full ? 'full' : '';
+      if (f.type === 'textarea') {
+        html += `<div class="${cls}"><label>${f.label}</label><textarea rows="2" id="sf_${s.id}_${f.key}" ${fieldReadOnly}>${val}</textarea></div>`;
+      } else if (f.type === 'select') {
+        html += `<div class="${cls}"><label>${f.label}</label><select id="sf_${s.id}_${f.key}" ${fieldReadOnly}>`;
+        for (const [v, l] of f.options) html += `<option value="${v}" ${data[f.key] === v ? 'selected' : ''}>${l}</option>`;
+        html += `</select></div>`;
+      } else {
+        html += `<div class="${cls}"><label>${f.label}</label><input id="sf_${s.id}_${f.key}" type="${f.type || 'text'}" value="${val}" ${fieldReadOnly}></div>`;
+      }
+    }
+    html += `</div>`;
   }
   return html;
 }
