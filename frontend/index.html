@@ -1920,6 +1920,23 @@ function renderStepForm(s, taskId, isCurrent, canOperate) {
     </div>`;
   }
   let html = `<div class="step-criteria">📋 准出条件：${cfg.criteria}</div>`;
+  // 负责人栏（环节3-8，2026-09-22 需求）：PL/管理员可就地改派；
+  // 服务端以 task_steps.assigned_to 为单一事实源+操作历史留痕，改派成功即整页重取全量同步
+  if (s.step >= 3 && s.step <= 8) {
+    const anTxt = userName(s.assigned_to);
+    const saOpts = (usersCache || []).filter(u => u.is_active !== false).map(u =>
+      `<option value="${u.id}" ${u.id === s.assigned_to ? 'selected' : ''}>${esc(u.realname || u.account)}（${esc(u.account)}）</option>`
+    ).join('');
+    const isAdminFe = currentUser && ((currentUser.roles || []).concat(currentUser.role ? [currentUser.role] : [])).includes('admin');
+    const isPlFe = currentUser && currentTask && (currentTask.owner === currentUser.id || isAdminFe);
+    html += `<div class="step-readonly" style="margin-top:10px;align-items:center">
+      <span class="kv">👤 环节负责人：<b>${esc(anTxt) || '待指派'}</b></span>
+      ${isPlFe ? `<span style="display:inline-flex;gap:6px;align-items:center">
+        <select id="sa_sel_${s.id}" style="font-size:12px;padding:3px 6px;border:1px solid var(--border);border-radius:6px;background:#fff">${saOpts}</select>
+        <button class="btn btn-sm" onclick="reassignStep(${taskId}, ${s.id}, ${s.step})">🔧 改派</button>
+      </span>` : ''}
+    </div>`;
+  }
   // 历史回显：全步骤——「处理方式·处理说明」与步骤5存量审核记录（修订模式下的可追溯读取端）
   if (isDone || !isCurrent) {
     if (data.handle_note) html += `<div class="step-readonly"><span class="kv">📝 处理说明：<b>${esc(data.handle_note)}</b></span></div>`;
@@ -2228,6 +2245,19 @@ async function hdSubmit(taskId, stepId, stepNo) {
   try {
     await api(`/api/tasks/${taskId}/steps/${stepId}/rollback`, { method: 'POST', body: { reason } });
     toast(`已回退至步骤${stepNo - 1}，原因已计入流程记录`);
+    openTask(taskId);
+  } catch (e) { toast(e.message, true); }
+}
+
+// PL改派非PL环节(3-8)责任人——服务端同步策略见 task_service.change_step_assignee;
+// 成功后整页重取(与回退同款)，环节头/banner/待我处理判定/操作历史一并达到新的一致态
+async function reassignStep(taskId, stepId, stepNo) {
+  const sel = document.getElementById(`sa_sel_${stepId}`);
+  const uid = sel ? parseInt(sel.value) : 0;
+  if (!uid) { toast('请选择新的环节负责人', true); return; }
+  try {
+    await api(`/api/tasks/${taskId}/steps/${stepId}/assignee`, { method: 'PATCH', body: { assigned_to: uid } });
+    toast(`步骤${stepNo}责任人已更新，流程记录已同步`);
     openTask(taskId);
   } catch (e) { toast(e.message, true); }
 }

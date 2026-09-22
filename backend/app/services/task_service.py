@@ -16,6 +16,7 @@ from app.schemas.schemas import (
     IssueResponse, IssueTreeResponse, IssueTreeNode, IssueTreeTask,
     IssueTreeProject, IssueTreeProduct
 )
+from app.core.security import _user_roles
 
 
 # 流程步骤定义（10步，去掉原"人力计算"）
@@ -401,6 +402,63 @@ class TaskService:
         await self.db.commit()
         await self.db.refresh(prev)
         return prev
+
+    async def change_step_assignee(self, task_id: int, step_id: int, new_uid: int, actor: User) -> TaskStep:
+        """PL改派非PL环节(3-8)的责任人（2026-09-22 需求）
+
+        全链一致的保证方式 = 尊重"单一事实来源"：环节操作权/我的任务/展示文案
+        全部由 task_steps.assigned_to 派生，改这一行 + 操作历史留痕即为全量同步；
+        不触碰任务级字段(owner/tse_id/version_owner/executor)——它们是更上游的
+        事实，按既有约定仅在任务字段改动时级联重铺步骤负责人。
+        开放范围即"非PL环节"：1/2为PL环节、9为双人共审(owner∪tse，见
+        list_tasks pending 特判与前端对应特判)、10为终态，均不开放。
+        已完成环节亦可改派(订正历史)，归责过程在操作历史中新旧双名俱全。
+        """
+        task = await self.get_task(task_id)
+        if not task:
+            raise ValueError("任务不存在")
+
+        # 权限：PL(任务owner) 或 admin(与 update_task 同判法: 'admin' in _user_roles)
+        actor_roles = _user_roles(actor)
+        if not ('admin' in actor_roles or task.owner == actor.id):
+            raise PermissionError("仅PL(任务负责人)或管理员可改派环节责任人")
+
+        stmt = select(TaskStep).where(TaskStep.id == step_id)
+        step = (await self.db.execute(stmt)).scalar_one_or_none()
+        if not step or step.task_id != task_id:
+            raise ValueError("环节不存在或不属于该任务")
+        if step.step in (1, 2, 9, 10):
+            raise ValueError(f"环节{step.step}为PL/双人共审/终态环节，不开放改派(仅3-8)")
+
+        new_user = (await self.db.execute(select(User).where(User.id == new_uid))).scalar_one_or_none()
+        if not new_user:
+            raise ValueError("目标责任人不存在")
+        if new_user.is_active is False:
+            raise ValueError(f"目标责任人 {new_user.realname or new_user.account} 已被禁用")
+        if step.assigned_to == new_uid:
+            raise ValueError("所选用户已经是该环节的责任人")
+
+        # 一次取齐新旧姓名用于留痕（旧负责人可为空 → 待指派）
+        ids = [i for i in {step.assigned_to, new_uid} if i]
+        names: dict = {}
+        if ids:
+            rows = (await self.db.execute(
+                select(User.id, User.realname, User.account).where(User.id.in_(ids))
+            )).all()
+            names = {r[0]: (r[1] or r[2]) for r in rows}
+        old_label = (
+            f"{names.get(step.assigned_to, '未知')}(ID:{step.assigned_to})" if step.assigned_to else "待指派"
+        )
+        new_label = f"{new_user.realname or new_user.account}(ID:{new_uid})"
+
+        step.assigned_to = new_uid
+        await self._log_action(
+            task_id, "step_reassign", actor.id,
+            f"步骤{step.step}「{step.step_name}」责任人由「{old_label}」改为「{new_label}」"
+        )
+        await self.db.commit()
+        await self.db.refresh(step)
+        return step
 
     async def _reset_step(self, task_id: int, step_no: int):
         """将指定步骤退回待处理"""

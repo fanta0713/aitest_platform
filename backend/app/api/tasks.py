@@ -281,6 +281,29 @@ async def rollback_step(
     return step
 
 
+class StepAssigneeReq(BaseModel):
+    assigned_to: int = Field(..., description="新环节责任人用户ID")
+
+
+@router.patch("/{task_id}/steps/{step_id}/assignee", response_model=StepResponse)
+async def change_step_assignee(
+    task_id: int,
+    step_id: int,
+    data: StepAssigneeReq,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """PL改派非PL环节(3-8)的责任人——全链以 task_steps.assigned_to 为单一事实源自动同步，操作历史留痕"""
+    service = TaskService(db)
+    try:
+        step = await service.change_step_assignee(task_id, step_id, data.assigned_to, current_user)
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return step
+
+
 @router.get("/{task_id}/issues", response_model=List[IssueResponse])
 async def get_issues(
     task_id: int,
