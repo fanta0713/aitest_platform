@@ -4420,12 +4420,8 @@ function renderStepNav() {
 function selectStep(stepNo) {
   activeStepNo = parseInt(stepNo);
   renderStepNav();
+  // 附件列表由 renderStepPage 尾部自启动加载（原此处的外包触发已退役，避免重复请求）
   renderStepPage(activeStepNo);
-  // 切到带附件的步骤时自动加载附件列表
-  const s = stepCache.find(x => parseInt(x.step) === parseInt(stepNo));
-  if (s && STEP_FORMS[s.step]?.attachments) {
-    loadStepFiles(s.id);
-  }
 }
 
 function renderStepPage(stepNo) {
@@ -4482,6 +4478,12 @@ function renderStepPage(stepNo) {
   // 步骤6: 加载已关联用例（用于分配执行人）
   if (s.step === 6) {
     loadCaseAssignments(s.id, taskId, isCurrent && canOperate);
+  }
+  // 带附件环节（3/4 等）：与其他动态区一样就地自启动附件列表加载——
+  // 此前附件是全页唯一靠 selectStep 回调驱动的"外包户"，直接进入详情
+  // 时没人点火，附件区永远停在"加载中..."（2026-09-22 用户反馈根因）
+  if (STEP_FORMS[s.step]?.attachments) {
+    loadStepFiles(s.id);
   }
   // 每个步骤页都加载操作历史
   loadActions(taskId);
