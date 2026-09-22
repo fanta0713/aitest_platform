@@ -408,12 +408,15 @@ class TaskService:
 
         全链一致的保证方式 = 尊重"单一事实来源"：环节操作权/我的任务/展示文案
         全部由 task_steps.assigned_to 派生，改这一行 + 操作历史留痕即为全量同步；
-        不触碰任务级字段(owner/tse_id/version_owner/executor)——它们是更上游的
-        事实，按既有约定仅在任务字段改动时级联重铺步骤负责人。
+        同时**级联回写**对应的任务级角色字段（3/4/6/8→version_owner、7→executor_id、
+        5→owner，与建任务初始化 owner_map 一一对应）——详情页头部的
+        「版本负责人/测试执行人/PL」横幅读的是任务级字段，不回写会两层撕裂
+        （2026-09-22 用户反馈"改派后标题栏没变化"）。注意：任务字段→步骤方向的
+        既有的级联重铺约定仍在（任务编辑时重铺全部步骤，未被本操作的局部改派覆写前有效）。
         开放范围即"非PL环节"：1/2为PL环节、9为双人共审(owner∪tse，见
         list_tasks pending 特判与前端对应特判)、10为终态，均不开放。
         已完成(completed)环节不做改派；rejected(被打回待处理)保留可改派
-        (打回即换人重来的场景)。审计动作 step_reassign 新旧双名俱全。
+        (打回即换人重来的场景)。审计动作 step_reassign 记新旧双名+级联说明。
         """
         task = await self.get_task(task_id)
         if not task:
@@ -457,9 +460,50 @@ class TaskService:
         new_label = f"{new_user.realname or new_user.account}(ID:{new_uid})"
 
         step.assigned_to = new_uid
+
+        # 级联回写任务级角色字段（2026-09-22 用户反馈：改派后标题栏没变化——
+        # 详情页头部的「版本负责人/测试执行人/PL」横幅读的是任务级字段，
+        # 只改步骤行会造成两层撕裂；需求原话"同步到任务状态"即指此）。
+        # 映射与建任务初始化 owner_map（task_service 约126行）一一对应：
+        #   3/4/6/8 ← version_owner；7 ← executor_id；5 ← owner
+        CASCADE_FIELD = {
+            3: ("version_owner", "版本负责人"),
+            4: ("version_owner", "版本负责人"),
+            6: ("version_owner", "版本负责人"),
+            8: ("version_owner", "版本负责人"),
+            7: ("executor_id", "测试执行人"),
+            5: ("owner", "PL负责人"),
+        }
+        sync_note = ""
+        pair = CASCADE_FIELD.get(step.step)
+        if pair:
+            fname, fzhan = pair
+            setattr(task, fname, new_uid)
+            # 同族环节对齐（用户原话"整个流程对应责任人都会同步到任务状态"）：
+            # 共享同一任务字段的兄弟环节(如 3/4/6/8 同属版本负责人)中，
+            # 所有未完成者一并对齐为新负责人——任务字段与步骤行不打架。
+            # 已完成环节只读(与 completed 锁一致)，缺席不动。
+            siblings = (await self.db.execute(
+                select(TaskStep).where(
+                    TaskStep.task_id == task_id,
+                    TaskStep.step.in_([k for k, v in CASCADE_FIELD.items() if v[0] == fname]),
+                    TaskStep.status != StepStatus.completed.value,
+                )
+            )).scalars().all()
+            aligned = []
+            for sb in siblings:
+                if sb.id == step.id or sb.assigned_to == new_uid:
+                    continue
+                sb.assigned_to = new_uid
+                aligned.append(sb.step)
+            if aligned:
+                sync_note = f"；任务级{fzhan}已同步为{new_label}，同组环节{'/'.join(map(str,aligned))}未完成者已一并对齐"
+            else:
+                sync_note = f"；任务级{fzhan}已同步为{new_label}"
+
         await self._log_action(
             task_id, "step_reassign", actor.id,
-            f"步骤{step.step}「{step.step_name}」责任人由「{old_label}」改为「{new_label}」"
+            f"步骤{step.step}「{step.step_name}」责任人由「{old_label}」改为「{new_label}」{sync_note}"
         )
         await self.db.commit()
         await self.db.refresh(step)
