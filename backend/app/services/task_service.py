@@ -327,6 +327,81 @@ class TaskService:
         await self.db.refresh(step)
         return step
 
+    async def rollback_step(
+        self,
+        task_id: int,
+        step_id: int,
+        reason: str,
+        user_id: int,
+    ) -> TaskStep:
+        """当前环节回退至上一环节（修订模式：业务数据保留，只动流程状态）
+
+        权限：任务owner(PL) 或 当前环节负责人（步骤7含 executors 全体执行人）
+        约束：只能回退当前环节；步骤5/9 有专属的"不通过打回"规则、步骤10 为终态，不走本通道
+        原因必填，落两处（全流程可追溯）：
+          1) 目标环节 remark 就地标注，2) 操作历史(action=step_rollback)
+        """
+        if not (reason or "").strip():
+            raise ValueError("回退原因必填")
+
+        task = await self.get_task(task_id)
+        if not task:
+            raise ValueError("任务不存在")
+
+        stmt = select(TaskStep).where(TaskStep.id == step_id)
+        step = (await self.db.execute(stmt)).scalar_one_or_none()
+        if not step or step.task_id != task_id:
+            raise ValueError("环节不存在或不属于该任务")
+        if step.step != task.current_step:
+            raise ValueError("只能回退当前环节")
+        if step.step in (5, 9):
+            raise ValueError(f"步骤{step.step}请使用既有的『不通过打回』流程")
+        if step.step <= 2:
+            raise ValueError("当前环节没有可回退的上一步")
+
+        # 权限：PL(owner) 或 当前环节负责人
+        is_owner = (task.owner == user_id)
+        is_cur_assignee = (step.assigned_to == user_id) or (step.assigned_to is None)
+        if step.step == 7:
+            executor_ids = set()
+            if task.executor_id:
+                executor_ids.add(task.executor_id)
+            if task.executors:
+                for e in task.executors:
+                    if isinstance(e, dict) and e.get('user_id'):
+                        executor_ids.add(int(e['user_id']))
+            if user_id in executor_ids:
+                is_cur_assignee = True
+        if not (is_owner or is_cur_assignee):
+            raise PermissionError("仅 PL 或当前环节负责人可回退")
+
+        prev_step_no = step.step - 1
+        prev = (await self.db.execute(
+            select(TaskStep).where(TaskStep.task_id == task_id, TaskStep.step == prev_step_no)
+        )).scalar_one_or_none()
+        if not prev:
+            raise ValueError("上一环节不存在")
+
+        # 回退核心：上一环节重开为"进行中"（保留begin_date等历史痕迹，仅清完成时间）
+        # 当前环节保持原状态（通常pending），等上一环节重新完成后自然流转回来
+        prev.status = StepStatus.in_progress.value
+        prev.end_date = None
+        marker = f"[{datetime.now().strftime('%Y-%m-%d %H:%M')} 回退自步骤{step.step}] {reason.strip()}"
+        prev.remark = f"{prev.remark} ｜ {marker}" if prev.remark else marker
+
+        # 进度/任务状态统一重算：_update_task_progress 会依据最早的"进行中"环节
+        # 自动把 current_step 修正为上一环节，并把任务status映射回对应阶段
+        await self._update_task_progress(task_id)
+
+        await self._log_action(
+            task_id, "step_rollback", user_id,
+            f"步骤{step.step}「{step.step_name}」回退至步骤{prev.step}「{prev.step_name}」。原因：{reason.strip()}"
+        )
+
+        await self.db.commit()
+        await self.db.refresh(prev)
+        return prev
+
     async def _reset_step(self, task_id: int, step_no: int):
         """将指定步骤退回待处理"""
         stmt = select(TaskStep).where(

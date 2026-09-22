@@ -4,6 +4,7 @@ API路由 - 测试任务
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from pydantic import BaseModel, Field
 from typing import List, Optional
 from app.db.database import get_db
 from app.core.security import get_current_user, _user_roles
@@ -246,6 +247,30 @@ async def update_step(
     if not step:
         raise HTTPException(status_code=404, detail="步骤不存在")
     return StepResponse.model_validate(step)
+
+
+class StepRollbackReq(BaseModel):
+    """环节回退请求：原因必填，计入流程记录（目标环节remark + 操作历史）"""
+    reason: str = Field(..., min_length=1, description="回退原因")
+
+
+@router.post("/{task_id}/steps/{step_id}/rollback", response_model=StepResponse)
+async def rollback_step(
+    task_id: int,
+    step_id: int,
+    data: StepRollbackReq,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """当前环节回退至上一环节（仅PL或当前环节负责人；步骤5/9走既有打回、10为终态）"""
+    service = TaskService(db)
+    try:
+        step = await service.rollback_step(task_id, step_id, data.reason, current_user.id)
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return step
 
 
 @router.get("/{task_id}/issues", response_model=List[IssueResponse])

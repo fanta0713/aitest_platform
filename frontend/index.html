@@ -1172,6 +1172,18 @@ tbody tr.clickable { cursor: pointer; }
     </div>
   </div>
 </div>
+
+<!-- 环节回退弹窗（PL或当前环节负责人；原因必填并计入操作历史） -->
+<div class="modal-mask" id="rollbackModal">
+  <div class="modal" style="width:520px;max-height:90vh;display:flex;flex-direction:column">
+    <div class="modal-head"><h3>← 返回上一环节</h3><button class="modal-close" onclick="closeModal('rollbackModal')">×</button></div>
+    <div class="modal-body" id="rollbackBody" style="flex:1;overflow-y:auto"></div>
+    <div class="modal-foot">
+      <button class="btn" onclick="closeModal('rollbackModal')">取消</button>
+      <button class="btn btn-primary" onclick="submitRollback()">↩ 确认回退</button>
+    </div>
+  </div>
+</div>
 <script>
 // ============ 基础工具 ============
 const API = '';
@@ -1985,8 +1997,14 @@ function renderStepForm(s, taskId, isCurrent, canOperate) {
   }
   // 操作按钮：只有当前环节 + 未完成 + 有权限 → 才显示
   if (!isDone) {
+    // 「返回上一环节」：环节3-8可发起（5走环境审核打回、9走数据审核打回、10终态不提供）
+    // 权限：PL(owner) 或 当前环节负责人——PL即使无本环节编辑权也可发起回退
+    const rbOk = isCurrent && currentTask && s.step >= 3 && ![5, 9, 10].includes(s.step);
+    const isPl = currentTask && currentTask.owner === currentUser.id;
+    const rbHtml = (rbOk && (canOperate || isPl)) ? `<button class="btn btn-sm" style="margin-right:8px" onclick="openRollbackModal(${taskId}, ${s.id}, ${s.step})">← 返回上一环节</button>` : '';
     if (isCurrent && canOperate) {
       html += `<div class="step-actions">`;
+      if (rbHtml) html += rbHtml;
       if (cfg.fields) html += `<button class="btn btn-sm" onclick="saveStepData(${taskId}, ${s.id})">💾 保存数据</button>`;
       if (s.step === 5) {
         html += `<button class="btn btn-sm btn-primary" onclick="submitReviewStep(${taskId}, ${s.id}, ${s.step})">提交审核</button>`;
@@ -1998,7 +2016,12 @@ function renderStepForm(s, taskId, isCurrent, canOperate) {
       html += `<div class="step-actions"><span class="muted" style="font-size:12px;padding:6px 0">⏸ 非当前环节，仅查看</span></div>`;
     } else if (!canOperate) {
       const assigneeName = userName(s.assigned_to);
-      html += `<div class="step-actions"><span class="muted" style="font-size:12px;padding:6px 0">🔒 该环节由 ${esc(assigneeName)} 负责，无操作权限</span></div>`;
+      if (rbHtml) {
+        // PL 无本环节操作权但可发起回退
+        html += `<div class="step-actions">${rbHtml}<span class="muted" style="font-size:12px;padding:6px 0">🔒 该环节由 ${esc(assigneeName)} 负责（你可发起回退）</span></div>`;
+      } else {
+        html += `<div class="step-actions"><span class="muted" style="font-size:12px;padding:6px 0">🔒 该环节由 ${esc(assigneeName)} 负责，无操作权限</span></div>`;
+      }
     }
   }
   return html;
@@ -2141,6 +2164,39 @@ async function completeStep(taskId, stepId) {
     openTask(taskId);
   } catch (e) { toast(e.message, true); }
 }
+
+// ============ 环节回退（PL或当前环节负责人；原因必填且计入操作历史） ============
+function openRollbackModal(taskId, stepId, stepNo) {
+  document.getElementById('rollbackModal').classList.add('show');
+  const warns = [];
+  // 步骤7→6 时若有已录执行结果，提示保留但不拦截
+  if (stepNo === 7 && Array.isArray(linkedCasesCache)) {
+    const doneCnt = linkedCasesCache.filter(c => c.latest_result).length;
+    if (doneCnt) warns.push(`<div style="margin-top:8px;padding:8px 10px;background:#fef9c3;border-radius:6px;font-size:12px;line-height:1.6">⚠️ 步骤7已有 <b>${doneCnt}</b> 条用例录入了执行结果。回退后这些结果<b>不会被清除</b>；如在上一环节调整用例分配，请自行复核执行结果的一致性。</div>`);
+  }
+  document.getElementById('rollbackBody').innerHTML = `
+    <div style="font-size:13px;line-height:1.7">将把 <b>步骤${stepNo}</b> 回退至 <b>步骤${stepNo - 1}</b>。<br>
+    <span class="muted" style="font-size:12px">上一环节将重开为「进行中」；本环节数据保留不动，流程历史完整可追溯。</span></div>
+    ${warns.join('')}
+    <div style="margin-top:12px">
+      <label style="font-size:13px;font-weight:600">回退原因<span style="color:var(--danger)">（必填）</span>，将记入操作历史</label>
+      <textarea id="rollbackReason" rows="3" style="width:100%;margin-top:6px" placeholder="例如：发现测试设计中遗漏关键场景，需补充用例后再执行"></textarea>
+    </div>`;
+  window._rbCtx = { taskId, stepId, stepNo };
+}
+
+async function submitRollback() {
+  const { taskId, stepId } = window._rbCtx;
+  const reason = (document.getElementById('rollbackReason').value || '').trim();
+  if (!reason) { toast('请填写回退原因', true); return; }
+  try {
+    await api(`/api/tasks/${taskId}/steps/${stepId}/rollback`, { method: 'POST', body: { reason } });
+    toast('已回退至上一环节，原因已计入流程记录');
+    closeModal('rollbackModal');
+    openTask(taskId);
+  } catch (e) { toast(e.message, true); }
+}
+
 async function saveDualReview(taskId, stepId) {
   const step = stepCache.find(s => s.id === stepId);
   if (!step) return;
