@@ -2754,6 +2754,7 @@ let casemodCache = [];
 let casemodExpanded = new Set();
 let caseNoModCount = 0;
 let currentLibId = null;
+let caseCurModId = 0; // 记忆右侧用例列表当前视图(0=全部用例,-1=未分类,N=模块ID)——供写操作后就地重取,而非硬踢回"全部用例"
 
 async function loadCaseLibs() {
   try {
@@ -3009,6 +3010,7 @@ let currentCaseList = [];
 
 async function loadCasesByModule(modId) {
   if (!currentLibId) return;
+  caseCurModId = modId; // 记忆当前视图,写操作(复制/新增/编辑等)成功后就地重取用
   caseCheckedSet = new Set(); // 切模块时清空选择
   const wrap = document.getElementById('caseListWrap');
   wrap.innerHTML = '<span class="muted">加载中…</span>';
@@ -3207,6 +3209,15 @@ async function doCopyCases() {
     }});
     toast(`已复制 ${r.copied} 条用例`);
     closeModal('copyModal');
+    // 写后就地重取(家族惯例,补齐复制这一漏网的):
+    // 仅当复制目标=当前正看着的库时才有必要刷——跨库时当前列表/树语义未变,
+    // 目标库等下次 openLibrary 自然全新取数。
+    // 列表按记忆视图 caseCurModId 原位重取(修"复制到相同子目录不刷新");
+    // 树计数走 reloadModules(casemodExpanded 展开态保留,不重置不闪)
+    if (targetLib === currentLibId) {
+      loadCasesByModule(caseCurModId || 0);
+      reloadModules();
+    }
     caseCheckedSet = new Set();
   } catch (e) { toast(e.message, true); }
 }
