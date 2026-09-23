@@ -194,6 +194,24 @@ input, select, textarea { font-family: inherit; font-size: 14px; outline: none; 
 .stat-card.clickable:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(15,23,42,.13); }
 .stat-card .chev { margin-left: auto; align-self: center; color: var(--text-sub); opacity: .5; font-size: 20px; line-height: 1; transition: opacity .15s ease, color .15s ease; }
 .stat-card.clickable:hover .chev { opacity: 1; color: var(--primary); }
+/* ===== Excel风列筛选(2026-09-23用户: "支持类似excel那样的筛选") =====
+   列头 ▾/⌕ 小钮=.sf-btn;激活列=.sf-th-on;面板=fixed浮层(z 300, body直挂)
+   勾选即筛,count 徽标与 activated 列头即时联动;摘要条=statFilterBar */
+.sf-btn { cursor: pointer; color: var(--text-sub); opacity: .55; font-size: 12px; padding: 1px 3px; border-radius: 4px; }
+.sf-btn:hover { opacity: 1; color: var(--primary); background: #f1f5f9; }
+th.sf-th-on { color: var(--primary); }
+th.sf-th-on .sf-btn { opacity: 1; color: #fff; background: var(--primary); }
+#statFilterPanel { position: fixed; z-index: 300; background: #fff; border: 1px solid var(--border);
+  border-radius: 10px; box-shadow: 0 8px 28px rgba(15,23,42,.18); width: 250px; display: none; overflow: hidden; }
+.sf-head { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px;
+  background: #f8fafc; border-bottom: 1px solid var(--border); font-size: 12px; color: var(--text-sub); }
+.sf-opts { max-height: 300px; overflow-y: auto; }
+.sf-opt { display: flex; align-items: center; gap: 8px; padding: 7px 12px; cursor: pointer; font-size: 13px; }
+.sf-opt:hover { background: #f1f5f9; }
+.sf-opt input { accent-color: var(--primary); }
+.sf-opt span:nth-of-type(1) { flex: 1; word-break: break-all; }
+.sf-count { color: var(--text-sub); font-size: 11px; }
+.sf-hit { padding: 6px 12px; font-size: 12px; color: var(--primary); }
 
 /* 卡片与表格 */
 .card {
@@ -849,6 +867,7 @@ tbody tr.clickable { cursor: pointer; }
     <div class="modal-body" id="statModalBody" style="padding:0"></div>
   </div>
 </div>
+<div id="statFilterPanel" onclick="event.stopPropagation()"></div>
 <div id="issueStatusMenu" style="display:none;position:fixed;z-index:400;background:#fff;border:1px solid var(--border);border-radius:8px;box-shadow:0 8px 28px rgba(15,23,42,.18);min-width:148px;padding:4px"></div>
 
 <!-- 添加成员弹窗 -->
@@ -5292,10 +5311,14 @@ const STAT_CARD_META = {
 
 function openStatCard(kind) {
   const meta = STAT_CARD_META[kind]; if (!meta) return;
+  // 面板/state卫生: 切卡或重开=全新表(筛选state按kind隔离,且不跨弹层生命期继承,注释钉死)
+  closeStatFilter();
+  if (kind !== 'issues') _statFilters[kind] = null;
   document.getElementById('statModalTitle').textContent = meta.title;
   const body = document.getElementById('statModalBody');
   let html = '';
 
+  let rowsRawCount = 0;  // 任务卡行集基数(else分支赋值;弹层尾hook决定是否首填tbody)
   window._statLastKind = kind;  // 弹层开着改状态,即时重算重显(updateIssueStatus尾部挂钩)
   if (kind === 'issues') {
     // 树没到货时的自愈路径: 现场亮"装载中",挂到同一颗在飞请求上,到了自动重开——零死区
@@ -5330,25 +5353,169 @@ function openStatCard(kind) {
         '</tbody></table>';
   } else {
     // 与后端 get_stats 逐字面对齐:active=非(done|closed),done=done/closed;allTasksCache 本就不含软删
-    const isIn = (kind === 'done') ? ((s) => ['done','closed'].includes(s))
-               : (kind === 'active') ? ((s) => !['done','closed'].includes(s))
-               : (() => true);
-    const rows = (allTasksCache || []).filter(tt => isIn(tt.status));
-    html = !rows.length
+    // === Excel风列筛选(2026-09-23): 所属产品/项目拆列, name⌕+prod▾+proj▾+step▾ 四列带筛选钮;
+    //     骨架一次性,tbody 由 sfApplyBody 现填(state 在函数头已重置) ===
+    rowsRawCount = sfKindRows(kind);
+    html = !rowsRawCount
       ? `<div class="empty" style="padding:26px">${meta.empty}</div>`
-      : `<table><thead><tr><th>编号</th><th>任务名称</th><th>所属产品 / 项目</th><th>进度</th><th>当前步骤</th></tr></thead><tbody>` +
-        rows.map(tt => `
-          <tr class="clickable" title="点击进入任务详情" onclick="openTask(${tt.id})">
-            <td style="font-family:monospace;color:var(--primary);font-weight:600;font-size:12px;white-space:nowrap">${esc(tt.code)}</td>
-            <td style="font-weight:500;max-width:240px;word-break:break-all">${esc(tt.name)}</td>
-            <td class="muted" style="font-size:12px;max-width:200px;word-break:break-all">${esc(tt.product_name || '—')} ▸ ${esc(tt.project_name || '—')}</td>
-            <td style="min-width:90px"><div style="display:flex;align-items:center;gap:8px"><div style="flex:1;height:6px;background:#e2e8f0;border-radius:3px;overflow:hidden"><div style="width:${tt.progress}%;height:100%;background:var(--primary)"></div></div><span style="font-size:12px;color:var(--text-sub)">${tt.progress}%</span></div></td>
-            <td><span class="badge badge-gray" style="font-size:11px;white-space:nowrap">${tt.current_step}. ${esc(STEP_NAMES[tt.current_step-1] || '—')}</span></td>
-          </tr>`).join('') +
-        '</tbody></table>';
+      : `<div id="statFilterBar" class="muted" style="padding:8px 14px;font-size:12px;border-bottom:1px dashed var(--border);display:none"></div>
+      <table><thead><tr>
+        <th>编号</th>
+        <th id="statTh-name" style="white-space:nowrap">任务名称 <span class="sf-btn" onclick="openStatFilter('name',event)" title="筛选:名称/编号包含">⌕</span></th>
+        <th id="statTh-prod" style="white-space:nowrap">所属产品 <span class="sf-btn" onclick="openStatFilter('prod',event)" title="筛选:所属产品">▾</span></th>
+        <th id="statTh-proj" style="white-space:nowrap">所属项目 <span class="sf-btn" onclick="openStatFilter('proj',event)" title="筛选:所属项目">▾</span></th>
+        <th>进度</th>
+        <th id="statTh-step" style="white-space:nowrap">当前步骤 <span class="sf-btn" onclick="openStatFilter('step',event)" title="筛选:当前步骤">▾</span></th>
+      </tr></thead><tbody id="statTBody"></tbody></table>`;
   }
   body.innerHTML = html;
+  if (kind !== 'issues' && rowsRawCount) sfApplyBody(kind);
   document.getElementById('statModal').classList.add('show');
+}
+
+/* ===== Excel风列筛选——状态机与管线(全部宿主在弹层生命期, body直挂Fixed面板) =====
+   语义: kind全集 -> 除目标列外的其它已应用筛选 -> 目列 distinct(∪自身已勾选0计数保观) ->
+   勾选onChange即 sfApplyBody(重渲tbody+chrome, 面板不动=输入焦点保住); 摘要条/空态/清除全部全套 */
+
+let _statFilters = {};
+let _sfLastXY = { x: 300, y: 200 };
+
+function sfGet(kind){
+  if(!_statFilters[kind]) _statFilters[kind] = { q:'', prod:new Set(), proj:new Set(), step:new Set() };
+  return _statFilters[kind];
+}
+function sfKindRows(kind){
+  const isIn = (kind==='done') ? ((s)=>['done','closed'].includes(s))
+             : (kind==='active') ? ((s)=>!['done','closed'].includes(s))
+             : (()=>true);
+  return (allTasksCache||[]).filter(tt=>isIn(tt.status));
+}
+function sfCell(tt){  // tbody渲染与筛选取值单一事实源——两处永不同步即bug
+  return {
+    prod: tt.product_name || '—',
+    proj: tt.project_name || '—',
+    step: tt.current_step + '. ' + (STEP_NAMES[tt.current_step-1] || '—'),
+  };
+}
+function sfFiltered(kind, f, skipCol){
+  const q=(f.q||'').toLowerCase();
+  return sfKindRows(kind).filter(tt=>{
+    const c=sfCell(tt);
+    if(skipCol!=='name' && q && !((tt.name||'')+' '+(tt.code||'')).toLowerCase().includes(q)) return false;
+    if(skipCol!=='prod' && f.prod.size && !f.prod.has(c.prod)) return false;
+    if(skipCol!=='proj' && f.proj.size && !f.proj.has(c.proj)) return false;
+    if(skipCol!=='step' && f.step.size && !f.step.has(c.step)) return false;
+    return true;
+  });
+}
+function sfChrome(kind){  // 摘要条+列头激活态(th高亮)——tbody之外的一切可见反馈
+  const f=sfGet(kind);
+  const bar=document.getElementById('statFilterBar');
+  if(bar){
+    const act=[];
+    if(f.q) act.push(['任务名称', f.q]);
+    if(f.prod.size) act.push(['所属产品', f.prod.size+' 项']);
+    if(f.proj.size) act.push(['所属项目', f.proj.size+' 项']);
+    if(f.step.size) act.push(['当前步骤', f.step.size+' 项']);
+    bar.innerHTML = act.length
+      ? '已启用筛选：'+act.map(([c,v])=>'<b>'+esc(c)+'</b>('+esc(String(v))+')').join(' · ')
+        +' ｜ <a href="javascript:void(0)" onclick="sfClearAll()" style="color:var(--primary)">清除全部</a>'
+      : '';
+    bar.style.display = act.length ? 'block' : 'none';
+  }
+  for(const cid of ['name','prod','proj','step']){
+    const th=document.getElementById('statTh-'+cid); if(!th) continue;
+    const on = (cid==='name') ? !!(f.q) : f[cid].size>0;
+    th.classList.toggle('sf-th-on', on);
+  }
+}
+function sfApplyBody(kind){
+  const f=sfGet(kind);
+  const rows=sfFiltered(kind, f, null);
+  const tb=document.getElementById('statTBody'); if(!tb) return;
+  tb.innerHTML = rows.length ? rows.map(tt=>{
+    const c=sfCell(tt);
+    return `
+          <tr class="clickable" title="点击进入任务详情" onclick="openTask(${tt.id})">
+            <td style="font-family:monospace;color:var(--primary);font-weight:600;font-size:12px;white-space:nowrap">${esc(tt.code)}</td>
+            <td style="font-weight:500;max-width:200px;word-break:break-all">${esc(tt.name)}</td>
+            <td class="muted" style="font-size:12px;max-width:120px;word-break:break-all">${esc(c.prod)}</td>
+            <td class="muted" style="font-size:12px;max-width:120px;word-break:break-all">${esc(c.proj)}</td>
+            <td style="min-width:80px"><div style="display:flex;align-items:center;gap:8px"><div style="flex:1;height:6px;background:#e2e8f0;border-radius:3px;overflow:hidden"><div style="width:${tt.progress}%;height:100%;background:var(--primary)"></div></div><span style="font-size:12px;color:var(--text-sub)">${tt.progress}%</span></div></td>
+            <td><span class="badge badge-gray" style="font-size:11px;white-space:nowrap;max-width:130px;overflow:hidden;text-overflow:ellipsis">${esc(c.step)}</span></td>
+          </tr>`;
+  }).join('')
+  : '<tr><td colspan="6" class="muted" style="padding:22px;text-align:center">没有符合筛选条件的任务&nbsp;&nbsp;<a href="javascript:void(0)" onclick="sfClearAll()" style="color:var(--primary)">清除全部筛选</a></td></tr>';
+  sfChrome(kind);
+}
+function sfClearAll(){
+  closeStatFilter();
+  _statFilters[window._statLastKind] = null;
+  sfApplyBody(window._statLastKind);
+}
+function closeStatFilter(){
+  const pn=document.getElementById('statFilterPanel'); if(pn) pn.style.display='none';
+  document.removeEventListener('click', _sfOutside);
+}
+function _sfOutside(){ closeStatFilter(); }
+function escJsAttr(s){ return String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'"); }
+
+function openStatFilter(col, ev){
+  const kind=window._statLastKind; if(!kind || kind==='issues') return;
+  const f=sfGet(kind);
+  closeStatFilter();
+  const pn=document.getElementById('statFilterPanel');
+  let html2='';
+  if(col==='name'){
+    html2='<div class="sf-head"><span>名称/编号 包含</span></div>'+
+      '<div style="padding:10px 12px"><input id="sfTxt" class="ipt" style="width:100%;padding:7px 10px" placeholder="输入即过滤…" value="'+esc(f.q||'')+'" oninput="sfTxtInput(this.value)"></div>'+
+      '<div id="sfHit" class="sf-hit">'+(f.q?('当前命中 '+sfFiltered(kind,f,null).length+' 条'):'输入即过滤')+'</div>';
+  } else {
+    // 候选=其它列筛选后的行集去重 ∪ 自身已勾选(计数0保观——不被姊妹列筛没影)
+    const cand=new Map();
+    for(const tt of sfFiltered(kind,f,col)){ const v=sfCell(tt)[col]; cand.set(v,(cand.get(v)||0)+1); }
+    for(const v of f[col]) if(!cand.has(v)) cand.set(v,0);
+    const vals=[...cand.keys()].sort((a,b)=>a.localeCompare(b,'zh'));
+    const opts = vals.length ? vals.map(v=>
+      '<label class="sf-opt"><input type="checkbox" '+(f[col].has(v)?'checked':'')+
+      ' onchange=\"sfChk(\''+col+'\',\''+escJsAttr(v)+'\',this.checked)\">'+
+      '<span>'+esc(v)+'</span><span class="sf-count">×'+cand.get(v)+'</span></label>').join('')
+      : '<div class="muted" style="padding:10px 12px">无可筛选项（受其它筛选所限）</div>';
+    html2='<div class="sf-head"><span>已选 <b id="sfSelN">'+f[col].size+'</b>/'+vals.length+'</span>'+
+      '<span><a href="javascript:void(0)" onclick="sfCheckAll(\''+col+'\',true)" style="color:var(--primary)">全选</a> · '+
+      '<a href="javascript:void(0)" onclick="sfCheckAll(\''+col+'\',false)" style="color:var(--primary)">清空</a></span></div>'+
+      '<div class="sf-opts">'+opts+'</div>';
+  }
+  pn.innerHTML=html2;
+  pn.style.display='block';
+  const x=Math.min((ev&&ev.clientX)||300, (window.innerWidth||1200)-270);
+  const y=Math.min((ev&&ev.clientY)||160, (window.innerHeight||800)-330);
+  _sfLastXY={x:Math.max(8,x), y:Math.max(8,y)};
+  pn.style.left=_sfLastXY.x+'px'; pn.style.top=_sfLastXY.y+'px';
+  setTimeout(()=>document.addEventListener('click',_sfOutside),0);
+}
+function sfTxtInput(v){
+  const kind=window._statLastKind; if(!kind) return;
+  const f=sfGet(kind); f.q=v.trim();
+  const hit=document.getElementById('sfHit');
+  if(hit) hit.textContent = f.q ? ('当前命中 '+sfFiltered(kind,f,null).length+' 条') : '输入即过滤';
+  sfApplyBody(kind);
+}
+function sfChk(col, val, on){
+  const kind=window._statLastKind; if(!kind) return;
+  const f=sfGet(kind);
+  if(on) f[col].add(val); else f[col].delete(val);
+  sfApplyBody(kind);
+  const sn=document.getElementById('sfSelN'); if(sn) sn.textContent=f[col].size;
+}
+function sfCheckAll(col, on){
+  const kind=window._statLastKind; if(!kind) return;
+  const f=sfGet(kind);
+  if(on){ for(const tt of sfFiltered(kind,f,col)) f[col].add(sfCell(tt)[col]); }
+  else f[col].clear();
+  sfApplyBody(kind);
+  // 就地重建面板(checkbox勾选态/计数同步;fake event沿用_lastXY保位置)
+  openStatFilter(col, { clientX:_sfLastXY.x, clientY:_sfLastXY.y, stopPropagation(){} });
 }
 
 // 问题单行点击 → 直接落四级深链再 switchView:loadIssueTree 的同步段快照(d16e178竞态防线)
