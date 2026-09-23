@@ -520,6 +520,9 @@ tbody tr.clickable { cursor: pointer; }
 .tb-name{max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .tb-dates{white-space:nowrap;font-size:12px;color:var(--text-sub)}
 .tb-modcnt{padding:10px 16px;border-bottom:1px solid var(--border);font-size:12px;color:var(--text-sub)}
+.tb-nw{white-space:nowrap}
+#statModalBody th{white-space:nowrap}
+.tb-name{min-width:150px}
 </style>
 <div class="card">
         <div class="card-head"><h3>最近任务</h3><button class="btn btn-sm" onclick="switchView('tasks')">查看全部</button></div>
@@ -883,7 +886,7 @@ tbody tr.clickable { cursor: pointer; }
 <!-- 问题单状态修改下拉菜单 -->
 <!-- 工作台统计卡下钻列表(2026-09-23: 用户"放在那里也没什么用"→即点即看;纯前端缓存装配零后端;弹层为临时态不落hash,F5消亡属有意) -->
 <div class="modal-mask" id="statModal">
-  <div class="modal" style="width:760px">
+  <div class="modal" style="width:min(1080px, calc(100vw - 48px))">
     <div class="modal-head"><h3 id="statModalTitle">—</h3><button class="modal-close" onclick="closeModal('statModal')">×</button></div>
     <div class="modal-body" id="statModalBody" style="padding:0"></div>
   </div>
@@ -5619,12 +5622,12 @@ function tbRow(e) { // v5(2026-09-23用户:展示编号/名称/产品/项目/当
   // 主管总览看"现在等谁",故只露current环节负责人,不像v4撒一把owner/tse/版/执四色貼纸
   const assignee = (t.current_step_assignee_name) || (t.current_step_assignee ? userName(t.current_step_assignee) : '—');
   return '<tr style="cursor:pointer" onclick="openTask(' + t.id + ')" title="点击进入任务详情">'
-    + '<td>' + tbEsc(t.code) + '</td>'
+    + '<td class="tb-nw">' + tbEsc(t.code) + '</td>'
     + '<td class="tb-name" title="' + tbEsc(t.name) + '">' + tbEsc(t.name) + '</td>'
-    + '<td>' + tbEsc(t.product_name || '—') + '</td>'
-    + '<td>' + tbEsc(t.project_name || '—') + '</td>'
-    + '<td>' + (STATUS_MAP[t.status] ? STATUS_MAP[t.status][0] : (STEP_NAMES[t.current_step - 1] || tbEsc(t.current_step_name) || ('第' + t.current_step + '步'))) + '</td>'
-    + '<td>' + tbEsc(assignee) + '</td>'
+    + '<td class="tb-nw">' + tbEsc(t.product_name || '—') + '</td>'
+    + '<td class="tb-nw">' + tbEsc(t.project_name || '—') + '</td>'
+    + '<td class="tb-nw">' + (STATUS_MAP[t.status] ? STATUS_MAP[t.status][0] : (STEP_NAMES[t.current_step - 1] || tbEsc(t.current_step_name) || ('第' + t.current_step + '步'))) + '</td>'
+    + '<td class="tb-nw">' + tbEsc(assignee) + '</td>'
     + '<td style="white-space:nowrap">' + progTxt + '</td></tr>';
 }
 function tbOpen(kind) { // 列表弹层,复用statModal基建(关闭 hygiene 与 Excel筛选家族同款)
