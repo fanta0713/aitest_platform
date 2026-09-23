@@ -1286,8 +1286,8 @@ async function enterApp() {
   // ① 决策+显影先行(纯同步,首帧即目标视图,赶在浏览器下一次绘制之前——
   //    修复 2026-09-23 用户反馈"每次刷新都先跳工作台再回来"的动画过程)
   const h = parseViewHash();
-  const detailHit = !!(h && h.view === 'taskDetail' && h.id);
-  paintViewOnly(detailHit ? 'taskDetail' : ((h && NAV_VIEWS.indexOf(h.view) >= 0) ? h.view : 'dashboard'));
+  const detailHit = !!((h && h.view === 'taskDetail' && h.id) || (h && h.view === 'suiteDetail' && h.sid));
+  paintViewOnly(detailHit ? (h.view === 'suiteDetail' ? 'suiteDetail' : 'taskDetail') : ((h && NAV_VIEWS.indexOf(h.view) >= 0) ? h.view : 'dashboard'));
   if (!h) setViewHash('dashboard');
   // ② 基础缓存先行(userName 用于详情横幅,老顺序的确定性保留)
   await Promise.all([loadUsers(), loadProjects(), loadZentaoProducts(), loadZentaoProjects()]);
@@ -1308,6 +1308,9 @@ async function enterApp() {
     } else {
       toast(`深链的用例库(ID:${h.lib})不存在或已删除，已回到用例库列表`, true);
     }
+  } else if (h && h.view === 'suiteDetail' && h.sid) {
+    // 套件详情深链:loadSuiteDetail 自带存在性门(查无此套件→toast+回套件列表)
+    await openSuiteDetail(h.sid);
   } else {
     switchView((h && NAV_VIEWS.indexOf(h.view) >= 0) ? h.view : 'dashboard', h && h.sub);
   }
@@ -1400,6 +1403,15 @@ function parseViewHash() {
     }
     return { view: 'tasks' };   // 纯 #/tasks = 产品列表层(旧行为)
   }
+  if (v === 'pp') {
+    // 单层:左侧产品选中态 #/pp[/{productId}];纯#/pp=默认首品(旧行为)
+    if (s && /^\d+$/.test(s)) return { view: 'pp', pprod: s };
+    return { view: 'pp' };
+  }
+  if (v === 'suiteDetail') {
+    // 套件详情此前根本不在白名单(刷新直接回工作台);数字段吃一层,缺失段视作套件列表
+    return (s && /^\d+$/.test(s)) ? { view: 'suiteDetail', sid: parseInt(s, 10) } : { view: 'suite' };
+  }
   if (NAV_VIEWS.indexOf(v) >= 0) {
     return (v === 'mytasks' && s === 'done') ? { view: 'mytasks', sub: 'done' } : { view: v };
   }
@@ -1428,6 +1440,11 @@ window.addEventListener('hashchange', () => {
     })();
     return;
   }
+  if (h.view === 'suiteDetail' && h.sid) {
+    // 手输/前进后退落到套件详情:已经在同套件则无事发生(setViewHash内置diff吸收)
+    if (sdSuiteId !== h.sid) openSuiteDetail(h.sid);
+    return;
+  }
   switchView(h.view, h.sub);
 });
 
@@ -1449,6 +1466,8 @@ function switchView(name, sub) {
   if (name === 'taskDetail' && currentTask) setViewHash('taskDetail', String(currentTask.id));
   else if (name === 'mytasks') setViewHash('mytasks', (sub === 'done') ? 'done' : null);
   else if (name === 'tasks') setViewHash('tasks', tasksHashSuffix());  // 保层:详情返回列表/他处切回时不吹掉下钻子段(内存层级还在,恢复块之外的对偶记账)
+  else if (name === 'pp' && ppSelectedProductId != null) setViewHash('pp', String(ppSelectedProductId));  // 保层:重进pp不丢左侧选中(消解URLvs内存漂移,F5也能复原同一家)
+  else if (name === 'suiteDetail' && sdSuiteId) setViewHash('suiteDetail', String(sdSuiteId));  // 套件详情记账:openSuiteDetail经此落全链
   else if (NAV_VIEWS.indexOf(name) >= 0) setViewHash(name);
 }
 
@@ -2578,6 +2597,11 @@ async function loadSuiteDetail() {
   if (sdSuite) {
     document.getElementById('sdTitle').textContent = '📦 ' + sdSuite.name;
     document.getElementById('sdDesc').textContent = sdSuite.description || '—';
+  } else {
+    // 存在性门(深链失效):查无此套件→提示+回套件列表,与caselib/issues/tasks同款优雅降级
+    toast(`深链的用例套件(ID:${sdSuiteId})不存在或已删除，已回到套件列表`, true);
+    switchView('suite');
+    return;
   }
   try {
     sdCases = await api(`/api/suites/${sdSuiteId}/cases`);
@@ -5595,13 +5619,27 @@ async function deleteUser(userId) {
 let ppSelectedProductId = null;
 
 async function loadPPPage() {
+  // 快照hash必须在同步段(switchView尾部截段竞态,tasks/issues同课):
+  // 尾行pp保层特例/通配分支会同步把#/pp/{pid}折回#/pp,恢复等await回来读的就是残段
+  const hr0 = parseViewHash();
   try {
     zentaoProductsCache = await api('/api/products');
     zentaoProjectsCache = await api('/api/projects');
   } catch (e) { zentaoProductsCache = []; zentaoProjectsCache = []; }
-  // 默认选中第一个产品
-  if (zentaoProductsCache.length && !ppSelectedProductId) {
-    ppSelectedProductId = zentaoProductsCache[0].id;
+  // 深链恢复:按入口快照校验产品存在性(Number化===严格等);失效回落默认首品
+  const wantPP = (hr0 && hr0.view === 'pp' && hr0.pprod && (zentaoProductsCache || []).some(p => p.id === Number(hr0.pprod)))
+    ? Number(hr0.pprod) : null;
+  if (wantPP != null) {
+    ppSelectedProductId = wantPP;
+    if (currentViewKey === 'pp') setViewHash('pp', String(wantPP));
+  } else {
+    if (hr0 && hr0.view === 'pp' && hr0.pprod && currentViewKey === 'pp') {
+      toast(`深链的产品(ID:${hr0.pprod})不存在或已变化，已回到默认产品`, true);
+    }
+    // 默认选中第一个产品(旧行为原样:会话内已选过的选择保留)
+    if (zentaoProductsCache.length && !ppSelectedProductId) {
+      ppSelectedProductId = zentaoProductsCache[0].id;
+    }
   }
   const ppDesc = document.getElementById('ppDesc');
   if (ppDesc) ppDesc.textContent = canManageTasks() ? '点击左侧产品查看对应项目' : '点击左侧产品查看对应项目（只读）';
@@ -5635,6 +5673,7 @@ function renderPPProductList() {
 
 function selectPPProduct(productId) {
   ppSelectedProductId = productId;
+  if (currentViewKey === 'pp') setViewHash('pp', String(productId));  // 左选即落账(切换产品/他处函数重进一并覆盖,diff幂等)
   renderPPProductList();
   renderPPProjects();
 }
