@@ -1274,12 +1274,18 @@ document.getElementById('loginPassword').addEventListener('keydown', e => { if (
 async function enterApp() {
   showApp();
   renderUser();
-  // 强制切到工作台，避免浏览器 cache 残留上次视图
-  if (window.location.hash) history.replaceState(null, '', window.location.pathname);
-  switchView('dashboard');
+  // 基础缓存先行:深链('#/taskDetail/81')的详情页依赖 userName() 渲染,须在其之前就绪
   await Promise.all([loadUsers(), loadProjects(), loadZentaoProducts(), loadZentaoProjects()]);
   await loadStats();
   await loadTasks();
+  // 按地址栏恢复视图,刷新/分享链接不再跌回工作台(2026-09-23 用户反馈);非法hash回落工作台
+  const h = parseViewHash();
+  let restored = false;
+  if (h && h.view === 'taskDetail' && h.id) {
+    try { await openTask(h.id); restored = !!currentTask; } catch (e) { restored = false; }
+  }
+  if (!restored) switchView((h && NAV_VIEWS.indexOf(h.view) >= 0) ? h.view : 'dashboard', h && h.sub);
+  if (!restored && !h) setViewHash('dashboard');   // 无hash首次进入时补个规范地址
   renderGreeting();
 }
 
@@ -1320,22 +1326,70 @@ function renderGreeting() {
 }
 
 // ============ 视图切换 ============
-function switchView(name) {
+// ============ 视图路由：把当前视图写进 hash,刷新/直连不断层(2026-09-23 用户反馈) ============
+// 例: #/mytasks 待我处理 ｜ #/mytasks/done 我已处理 ｜ #/taskDetail/81 任务详情深链
+// 程序内跳转用 replaceState(不产生浏览历史、不触发 hashchange);监听器只接待输入/前进后退。
+const NAV_VIEWS = ['dashboard','tasks','mytasks','pp','issues','caselib','suite','people'];
+let currentViewKey = null;
+
+function setViewHash(view, sub) {
+  const h = '#/' + view + (sub ? '/' + sub : '');
+  if (window.location.hash !== h) history.replaceState(null, '', h);
+}
+
+function parseViewHash() {
+  const m = (window.location.hash || '').match(/^#\/(\w+)(?:\/(\w+))?$/);
+  if (!m) return null;
+  const v = m[1], s = m[2];
+  if (v === 'taskDetail') {
+    return (s && /^\d+$/.test(s)) ? { view: 'taskDetail', id: parseInt(s, 10) } : null;
+  }
+  if (NAV_VIEWS.indexOf(v) >= 0) {
+    return (v === 'mytasks' && s === 'done') ? { view: 'mytasks', sub: 'done' } : { view: v };
+  }
+  return null;
+}
+
+window.addEventListener('hashchange', () => {
+  if (!currentUser) return;                      // 登录页期间不带视图状态
+  const h = parseViewHash();
+  if (!h) return;                                // 未知hash视作无效,不动当前界面
+  if (h.view === 'taskDetail') {
+    if (!currentTask || currentTask.id !== h.id) openTask(h.id);   // 否则正是当前详情,忽略
+    return;
+  }
+  if (h.view === 'mytasks' && currentViewKey === 'mytasks') {
+    // 仅在tab差异时重拉,避免同视图hash事件引发重复加载
+    const want = h.sub === 'done' ? 'done' : 'pending';
+    const cur = document.querySelector('.mytab.btn-primary');
+    if (cur && cur.id === 'mtab-' + want) return;
+  }
+  switchView(h.view, h.sub);
+});
+
+function switchView(name, sub) {
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n => n.classList.toggle('active', n.dataset.view === name));
   const el = document.getElementById('view-' + name);
   if (el) el.classList.add('active');
   if (name === 'dashboard') { loadStats(); loadTasks(); }
   if (name === 'tasks') loadTasks();
-  if (name === 'mytasks') loadMyTasks('pending');
+  if (name === 'mytasks') loadMyTasks(sub === 'done' ? 'done' : 'pending');
   if (name === 'people') renderUserRoles();
   if (name === 'pp') loadPPPage();
   if (name === 'caselib') loadCaseLibs();
   if (name === 'suite') loadSuites();
   if (name === 'issues') loadIssueTree();
+  // 落地址:任务详情带任务id;我的任务仅"我已处理"落子标识(默认tab保持极简)
+  currentViewKey = name;
+  if (name === 'taskDetail' && currentTask) setViewHash('taskDetail', String(currentTask.id));
+  else if (name === 'mytasks') setViewHash('mytasks', (sub === 'done') ? 'done' : null);
+  else if (NAV_VIEWS.indexOf(name) >= 0) setViewHash(name);
 }
 
 async function loadMyTasks(mode = 'pending') {
+  // tab热键(context:本视图内点击)也落hash;switchView先行的场合它会与之同值自然no-op
+  if (currentViewKey === 'mytasks') setViewHash('mytasks', (mode === 'done') ? 'done' : null);
   // 切换tab样式
   document.querySelectorAll('.mytab').forEach(b => b.classList.remove('active', 'btn-primary'));
   const tabBtn = document.getElementById('mtab-' + mode);
