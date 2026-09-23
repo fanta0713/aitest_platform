@@ -4892,6 +4892,9 @@ function issuesHashSuffix() {
 }
 
 async function loadIssueTree() {
+  // 快照hash必须在同步段:switchView尾部的setViewHash会把#/issues/P/Q截短成#/issues,
+  // 若恢复块等await回来再读hash,读到的永远是残段(caselib代靠内存状态落账无此竞态,本代读URL就被自家截胡)
+  const hr0 = parseViewHash();
   try {
     const data = await api('/api/tasks/issues/tree');
     issueTreeCache = data;
@@ -4899,9 +4902,9 @@ async function loadIssueTree() {
     document.getElementById('issueTreeOpen').textContent = `未关闭 ${data.open_count}`;
     issueNavLevel = 'products';
     issueNavProductId = issueNavProjectId = issueNavTaskId = null;
-    // 深链恢复(唯一恢复点,enterApp刷新与hashchange共用):按当前hash逐层校验、逐层深入,
+    // 深链恢复(唯一恢复点,enterApp刷新与hashchange共用):按入口快照逐层校验、逐层深入,
     // 断在哪层就停在哪层并用 issuesHashSuffix 把地址对齐到实际达成的层级(部分失链不漂移)
-    const hr = parseViewHash();
+    const hr = hr0;
     if (hr && hr.view === 'issues' && hr.iprod) {
       const prod = (data.products || []).find(p => String(p.product_id) === String(hr.iprod));
       if (prod) {
