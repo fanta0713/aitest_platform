@@ -685,7 +685,7 @@ tbody tr.clickable { cursor: pointer; }
       <div id="issueNavTasks" style="display:none">
         <div class="card">
           <table>
-            <thead><tr><th>编号</th><th>任务名称</th><th>版本</th><th>起止时间</th><th>状态</th><th>进度</th><th>当前步骤</th><th>问题单</th></tr></thead>
+            <thead><tr><th>编号</th><th>任务名称</th><th>版本</th><th>起止时间</th><th>状态</th></tr></thead>
             <tbody id="issueTasksBody"></tbody>
           </table>
           <div class="empty" id="issueTasksEmpty" style="display:none">该项目下暂无任务</div>
@@ -5101,22 +5101,16 @@ function renderIssueNavTasks() {
   const tasks = proj?.tasks || [];
   const body = document.getElementById('issueTasksBody');
   document.getElementById('issueTasksEmpty').style.display = tasks.length ? 'none' : 'block';
+  // 2026-09-23 定夺: 砍掉进度/当前步骤/问题单三列(信息错+没用)——顺便修史上错位:
+  // 旧表头8列vs旧数据行7格永远差一位,"测试完成"挂到"起止时间"头顶即此病;
+  // 现在5列表头对5格数据,起止时间补真身(formatTaskDateRange与测试任务页同一双源)
   body.innerHTML = tasks.map(t => `
     <tr class="clickable" onclick="enterIssueTask('${t.task_id}')">
       <td style="font-family:monospace;color:var(--primary);font-weight:600;font-size:12px">${esc(t.task_code || '')}</td>
       <td style="font-weight:500">${esc(t.task_name)}</td>
       <td><span class="muted" style="font-size:12px">${esc(t.version || '—')}</span></td>
+      <td class="muted" style="font-size:12px">${formatTaskDateRange(t)}</td>
       <td>${statusBadge(t.status)}</td>
-      <td style="min-width:100px">
-        <div style="display:flex;align-items:center;gap:8px">
-          <div style="flex:1;height:6px;background:#e2e8f0;border-radius:3px;overflow:hidden">
-            <div style="width:${t.progress}%;height:100%;background:var(--primary)"></div>
-          </div>
-          <span style="font-size:12px;color:var(--text-sub)">${t.progress}%</span>
-        </div>
-      </td>
-      <td><span class="badge badge-gray" style="font-size:11px">${t.current_step}. ${STEP_NAMES[t.current_step-1] || '—'}</span></td>
-      <td><b>${t.issues.length}</b></td>
     </tr>`).join('');
 }
 

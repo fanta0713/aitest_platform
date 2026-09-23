@@ -835,9 +835,15 @@ class IssueService:
                 proj_key,
                 {"project_id": proj.id if proj else None, "project_name": proj_name, "tasks": {}},
             )
+            # 2026-09-23口径修复: 在收录期就把本任务的快照存进dict——
+            # 此前组装段直接引用外层rows循环的遗留变量task(=最后一行), 造成同项目下
+            # 所有任务的version/status/progress/current_step都是"碰巧最后一个任务"的值(用户实证显示错误)
             t = j["tasks"].setdefault(
                 task.id,
-                {"task_id": task.id, "task_name": task.name, "task_code": task.code, "issues": []},
+                {"task_id": task.id, "task_name": task.name, "task_code": task.code,
+                 "version": task.version, "status": task.status,
+                 "progress": task.progress or 0, "current_step": task.current_step or 0,
+                 "begin_date": task.begin_date, "end_date": task.end_date, "issues": []},
             )
             t["issues"].append(node)
 
@@ -847,14 +853,17 @@ class IssueService:
             for _, jv in pv["projects"].items():
                 tasks_out = []
                 for _, tv in jv["tasks"].items():
+                    # 改读本任务自己在收录期的快照(不再用外层遗留变量), 日期补充入户
                     tasks_out.append(IssueTreeTask(
                         task_id=tv["task_id"],
                         task_name=tv["task_name"],
                         task_code=tv["task_code"],
-                        version=task.version,
-                        status=task.status,
-                        progress=task.progress or 0,
-                        current_step=task.current_step or 0,
+                        version=tv.get("version"),
+                        status=tv.get("status"),
+                        progress=tv.get("progress", 0),
+                        current_step=tv.get("current_step", 0),
+                        begin_date=tv.get("begin_date"),
+                        end_date=tv.get("end_date"),
                         issues=tv["issues"],
                     ))
                 projects_out.append(IssueTreeProject(

@@ -168,6 +168,10 @@ class IssueTreeTask(BaseModel):
     status: Optional[str] = None
     progress: int = 0
     current_step: int = 0
+    # 2026-09-23 问题单第三层改造: 起止时间入树(前端砍掉进度/当前步骤/问题单三列后
+    # 表头仍有"起止时间",此前的错位根因之一就是表头8列vs数据7格永远差一格格子)
+    begin_date: Optional[date] = None
+    end_date: Optional[date] = None
     issues: List[IssueTreeNode] = []
 
 
