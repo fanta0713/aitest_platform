@@ -1300,6 +1300,14 @@ async function enterApp() {
     // 失效深链(任务被删/无权限)→ 已提示,壳回落工作台,与旧"restored"语义一致
     try { await openTask(h.id); } finally {}
     if (!(currentTask && currentTask.id === h.id)) switchView('dashboard');
+  } else if (h && h.view === 'caselib' && h.lib) {
+    // 用例库二级深链:取全库缓存(名字栏有着落)→进库;库已删→留列表态+一句提示,不硬错
+    await loadCaseLibs();
+    if ((caselibCache || []).some(l => l.id === h.lib)) {
+      await openLibrary(h.lib, h.mod || 0);
+    } else {
+      toast(`深链的用例库(ID:${h.lib})不存在或已删除，已回到用例库列表`, true);
+    }
   } else {
     switchView((h && NAV_VIEWS.indexOf(h.view) >= 0) ? h.view : 'dashboard', h && h.sub);
   }
@@ -1355,11 +1363,21 @@ function setViewHash(view, sub) {
 }
 
 function parseViewHash() {
-  const m = (window.location.hash || '').match(/^#\/(\w+)(?:\/(\w+))?$/);
+  // 三段制: #/视图[/子标识[/孙标识]] — caselib 用满三层: #/caselib/{库ID}/{模块ID(可-1未分类)}
+  const m = (window.location.hash || '').match(/^#\/(\w+)(?:\/([\w-]+))?(?:\/([\w-]+))?$/);
   if (!m) return null;
-  const v = m[1], s = m[2];
+  const v = m[1], s = m[2], t = m[3];
   if (v === 'taskDetail') {
     return (s && /^\d+$/.test(s)) ? { view: 'taskDetail', id: parseInt(s, 10) } : null;
+  }
+  if (v === 'caselib') {
+    // 库ID必须是数字才算二级;非数字段视作列表态(容错)
+    if (s && /^\d+$/.test(s)) {
+      const r = { view: 'caselib', lib: parseInt(s, 10) };
+      if (t && /^-?\d+$/.test(t)) r.mod = parseInt(t, 10);  // -1=未分类
+      return r;
+    }
+    return { view: 'caselib' };   // 纯 #/caselib = 列表层(旧行为不变)
   }
   if (NAV_VIEWS.indexOf(v) >= 0) {
     return (v === 'mytasks' && s === 'done') ? { view: 'mytasks', sub: 'done' } : { view: v };
@@ -1380,6 +1398,14 @@ window.addEventListener('hashchange', () => {
     const want = h.sub === 'done' ? 'done' : 'pending';
     const cur = document.querySelector('.mytab.btn-primary');
     if (cur && cur.id === 'mtab-' + want) return;
+  }
+  if (h.view === 'caselib' && h.lib) {
+    // 手输/前进后退落到用例库二级深链:先取全库缓存(保名字栏)再进详情
+    (async () => {
+      await loadCaseLibs();
+      if ((caselibCache || []).some(l => l.id === h.lib)) await openLibrary(h.lib, h.mod || 0);
+    })();
+    return;
   }
   switchView(h.view, h.sub);
 });
@@ -2886,6 +2912,8 @@ let currentLibId = null;
 let caseCurModId = 0; // 记忆右侧用例列表当前视图(0=全部用例,-1=未分类,N=模块ID)——供写操作后就地重取,而非硬踢回"全部用例"
 
 async function loadCaseLibs() {
+  // 列表态收hash:返回按钮/建库/删库/改库后统一抹掉二级子段(setViewHash自带diff,幂等)
+  if (currentViewKey === 'caselib') setViewHash('caselib');
   try {
     caselibCache = await api('/api/cases/libraries');
   } catch (e) { return; }
@@ -2964,7 +2992,7 @@ function exportCases(libId) {
   window.open(`/api/cases/libraries/${libId}/export`, '_blank');
 }
 
-async function openLibrary(libId) {
+async function openLibrary(libId, mod) {
   currentLibId = libId;
   switchView('caselib');
   // 加载模块和用例
@@ -3002,8 +3030,8 @@ async function openLibrary(libId) {
       <div class="card" id="caseListWrap" style="flex:1;overflow-y:auto;padding:12px"><span class="muted">加载中…</span></div>
     </div>`;
   initSplitter();
-  // 自动加载全部用例，省得用户还得点一下
-  loadCasesByModule(0);
+  // 自动加载全部用例，省得用户还得点一下(mod:深链恢复时直达指定模块,含-1未分类)
+  loadCasesByModule(mod || 0);
 }
 
 function buildModuleTree(mods) {
@@ -3140,6 +3168,8 @@ let currentCaseList = [];
 async function loadCasesByModule(modId) {
   if (!currentLibId) return;
   caseCurModId = modId; // 记忆当前视图,写操作(复制/新增/编辑等)成功后就地重取用
+  // 明细态落hash:#/caselib/{库}/{模块}(支持-1未分类);程序内replaceState,不触监听、无回环
+  if (currentViewKey === 'caselib') setViewHash('caselib', currentLibId + '/' + modId);
   caseCheckedSet = new Set(); // 切模块时清空选择
   const wrap = document.getElementById('caseListWrap');
   wrap.innerHTML = '<span class="muted">加载中…</span>';
