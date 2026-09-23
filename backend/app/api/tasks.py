@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 from typing import List, Optional
 from app.db.database import get_db
 from app.core.security import get_current_user, _user_roles
-from app.models.models import User, Project, TaskStep, TaskCaseLink
+from app.models.models import User, Project, TaskStep, TaskCaseLink, TaskIssue
 from app.services.task_service import TaskService, IssueService
 from app.schemas.schemas import (
     TaskCreate, TaskUpdate, TaskStepUpdate,
@@ -336,8 +336,15 @@ async def update_issue(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    """更新问题"""
+    """更新问题(2026-09-23权限定夺: 仅提单人本人可改,管理员豁免——用户:"陆家豪提的单梅昌富就不能更改状态")"""
     service = IssueService(db)
+    # 预取做属主校验(404/403语义分明;update_issue内部不再重复取)
+    res = await db.execute(select(TaskIssue).where(TaskIssue.id == issue_id))
+    issue_row = res.scalar_one_or_none()
+    if not issue_row:
+        raise HTTPException(status_code=404, detail="问题不存在")
+    if issue_row.reporter != current_user.id and "admin" not in _user_roles(current_user):
+        raise HTTPException(status_code=403, detail="仅提单人可修改问题单状态")
     issue = await service.update_issue(issue_id, data)
     if not issue:
         raise HTTPException(status_code=404, detail="问题不存在")
