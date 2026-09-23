@@ -5608,27 +5608,23 @@ const TB_META = {
   nosched: ['未排期任务', 'var(--text-sub)', '未填写结束日期,不计入三态']
 };
 function tbFmtD(v) { return v ? String(v) : '&mdash;'; }
-function tbRow(e) { // v5(2026-09-23用户:展示编号/名称/产品/项目/当前环节/环节负责人/进度就OK)——7列紧凑款
+function tbRow(e) { // v7(2026-09-23用户:红框的偏慢标不用展示+编号置蓝可点+其他地方不点头进详情)——简洁收权款
   const t = e.t;
   const dlTxt = e.days == null ? '<span class="badge badge-gray">未排期</span>'
     : e.days < 0 ? '<span class="badge badge-red">超期 ' + (-e.days) + ' 天</span>'
     : e.days === 0 ? '<span class="badge badge-amber">今天到期</span>'
     : '<span class="badge badge-green">剩 ' + e.days + ' 天</span>';
-  const slow = (e.gap != null && e.gap >= TB_SLOW_GAP)
-    ? ' <span class="badge badge-amber" title="期望' + e.exp + '%、实际落后' + e.gap + '个百分点(阈值' + TB_SLOW_GAP + 'pp)">偏慢' + e.gap + 'pp</span>'
-    : '';
-  const progTxt = dlTxt + ' ' + (t.progress || 0) + '%' + slow;
-  // 环节负责人=current环节assigned_to(后端TaskResponse.current_step_assignee官方直出,schemas.py:70);
-  // 主管总览看"现在等谁",故只露current环节负责人,不像v4撒一把owner/tse/版/执四色貼纸
+  // 环节负责人=current环节assigned_to(后端TaskResponse.current_step_assignee官方直出,schemas.py:70)
   const assignee = (t.current_step_assignee_name) || (t.current_step_assignee ? userName(t.current_step_assignee) : '—');
-  return '<tr style="cursor:pointer" onclick="openTask(' + t.id + ')" title="点击进入任务详情">'
-    + '<td class="tb-nw">' + tbEsc(t.code) + '</td>'
+  // 唯一入口=编号蓝链(用户:其他地方不支持点击);行级onclick/cursor/title三件随v7撤编
+  return '<tr>'
+    + '<td class="tb-nw"><span style="color:var(--primary);cursor:pointer" onclick="openTask(' + t.id + ')" title="点击进入任务详情">' + tbEsc(t.code) + '</span></td>'
     + '<td class="tb-name" title="' + tbEsc(t.name) + '">' + tbEsc(t.name) + '</td>'
     + '<td class="tb-nw">' + tbEsc(t.product_name || '—') + '</td>'
     + '<td class="tb-nw">' + tbEsc(t.project_name || '—') + '</td>'
     + '<td class="tb-nw">' + (STATUS_MAP[t.status] ? STATUS_MAP[t.status][0] : (STEP_NAMES[t.current_step - 1] || tbEsc(t.current_step_name) || ('第' + t.current_step + '步'))) + '</td>'
     + '<td class="tb-nw">' + tbEsc(assignee) + '</td>'
-    + '<td style="white-space:nowrap">' + progTxt + '</td></tr>';
+    + '<td class="tb-nw">' + dlTxt + ' ' + (t.progress || 0) + '%</td></tr>';
 }
 function tbOpen(kind) { // 列表弹层,复用statModal基建(关闭 hygiene 与 Excel筛选家族同款)
   closeStatFilter();
