@@ -1617,7 +1617,7 @@ const STATUS_MAP = {
   review: ['数据审核', 'badge-violet'], done: ['测试完成', 'badge-green'],
   closed: ['已关闭', 'badge-gray'],
 };
-const STEP_NAMES = ['任务发起','测试设计','版本配套','环境确认','环境审核','测试用例分配','执行测试','测试完成','数据审核','任务结束'];
+const STEP_NAMES = ['任务发起','测试设计','版本配套','环境确认','环境审核','测试用例分配','执行测试','测试完成','数据审核']; // 9步:原第10步"任务结束"已裁撤,数据审核双审通过即完结
 
 function statusBadge(st) {
   const [label, cls] = STATUS_MAP[st] || [st, 'badge-gray'];
@@ -1876,11 +1876,13 @@ async function openTask(id) {
     <span>测试执行人：<b>${esc(userName(t.executor_id))}</b></span>` + (t.executors && t.executors.length ? `<span>其他执行人：<b>${t.executors.map(e => esc(userName(e.user_id))).join('、')}</b></span>` : '');
   document.getElementById('dProgress').style.width = t.progress + '%';
   document.getElementById('dProgressText').textContent = t.progress + '%';
-  document.getElementById('dStepText').textContent = `第${t.current_step}步：${t.current_step_name || STEP_NAMES[t.current_step-1] || '—'}`;
+  document.getElementById('dStepText').textContent = t.status === 'done'
+    ? '✅ 已全部完成（数据审核通过即完结，原"任务结束"环节已裁撤）'
+    : `第${t.current_step}步：${t.current_step_name || STEP_NAMES[t.current_step-1] || '—'}`;
   await loadSteps(id);  // loadSteps 内部会渲染步骤导航+页面, 并加载用例/问题/历史
 }
 
-// 各环节准出条件配置（10步，去掉原"人力计算"）
+// 各环节准出条件配置（9步；原10步"任务结束"已裁撤，数据审核=末环）
 const STEP_FORMS = {
   1: { criteria: '给出测试任务名称、待测产品名称、项目名称', readonly: true },
   2: { criteria: '关联测试方案链接 + 关联测试用例（均必填）', fields: [
@@ -1900,8 +1902,7 @@ const STEP_FORMS = {
     { key: 'auto_result_url', label: '自动化工具结果链接', type: 'url', full: true, required: true },
   ]},
   9: { criteria: 'PL 和 TSE 都审核通过后才可下行；如需补测，退回环节8（测试完成）由版本负责人组织补测后重新提交', dualReview: true },
-  10: { criteria: '任务归档、总结复盘' },
-};
+}; // 9步:原第10步"任务结束"已裁撤(2026-09-23),双方审核通过即任务完结
 
 // ===== 改派候选人资格（2026-09-22 需求1/2） =====
 // 与后端 CASCADE_FIELD 家族同源：环节 → 任务级角色字段 → 项目角色(project_role)。

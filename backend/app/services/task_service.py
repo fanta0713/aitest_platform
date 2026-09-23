@@ -19,7 +19,8 @@ from app.schemas.schemas import (
 from app.core.security import _user_roles
 
 
-# 流程步骤定义（10步，去掉原"人力计算"）
+# 流程步骤定义（9步；原第10步"任务结束"已裁撤——2026-09-23 用户定夺"感觉没什么用"，
+# 数据审核(9)双审通过即任务完结(done)。存量任务的 step10 行由一次性迁移清除。）
 FLOW_STEPS = [
     {"step": 1, "name": "任务发起", "type": "create", "roles": ["pl"]},
     {"step": 2, "name": "测试设计", "type": "design", "roles": ["tse"]},
@@ -30,7 +31,6 @@ FLOW_STEPS = [
     {"step": 7, "name": "执行测试", "type": "execute", "roles": ["executor"]},  # 合并原"问题记录"功能
     {"step": 8, "name": "测试完成", "type": "execute", "roles": ["executor"]},
     {"step": 9, "name": "数据审核", "type": "review", "roles": ["version", "tse"]},
-    {"step": 10, "name": "任务结束", "type": "end", "roles": ["pl"]},
 ]
 
 # 改派级联映射（环节号 → 任务级角色字段, 中文名）：与建任务初始化 owner_map 同源。
@@ -44,6 +44,7 @@ CASCADE_FIELD = {
     7: ("executor_id", "测试执行人"),
     5: ("owner", "PL负责人"),
 }
+# 说明:原10"任务结束"的键随环节裁撤移除(其归宿是任务级 status=done,非数据行)。
 
 # 环节家族 ↔ 项目角色(project_role)：改派候选人资格的唯一口径（2026-09-22 需求1/2）。
 # 与 CASCADE_FIELD 家族一一同源——改出去的人必然同时合法占据对应"任务级角色字段"，
@@ -142,7 +143,7 @@ class TaskService:
         await self._log_action(task_id, "step_updated", user_id, "步骤1任务发起自动完成，进入测试设计")
 
     async def _init_steps(self, task_id: int, task_data: TaskCreate):
-        """初始化任务步骤"""
+        """初始化任务步骤（9步流程，见 FLOW_STEPS）"""
         owner_map = {
             1: task_data.owner,
             2: task_data.tse_id,
@@ -152,8 +153,7 @@ class TaskService:
             6: task_data.version_owner,   # 测试用例分配
             7: task_data.executor_id,     # 执行测试（合并原"问题记录"功能）
             8: task_data.version_owner,   # 测试完成（报告整理/log链接/自动化结果）—— 归版本负责人
-            9: None,                       # 数据审核（PL + TSE 双审核，assigned_to=None 让两人都能操作）
-            10: task_data.owner,           # 任务结束
+            9: None,                       # 数据审核（PL + TSE 双审核，assigned_to=None 让两人都能操作；末环，双通过即任务完结）
         }
         
         for step_info in FLOW_STEPS:
@@ -359,8 +359,8 @@ class TaskService:
         """当前环节回退至上一环节（修订模式：业务数据保留，只动流程状态）
 
         权限：仅当前环节负责人（步骤7含 executors 全体执行人）；PL 特权已取消
-        约束：只能回退当前环节；步骤9 有专属的"需补测打回"规则（双审核）、步骤10 为终态，不走本通道
-        （步骤5 已并入手动回退——通过与否以"提交到下一环节/返回上一环节"表达，审核意见记入处理说明）
+        约束：只能回退当前环节；步骤9 有专属的"需补测打回"规则（双审核，亦即末环），不走本通道
+        （步骤5 已并入手动回退——通过与否以"提交到下一环节/返回上一环节"表达，审核意见记入处理说明；原"步骤10终态"已随该环节裁撤失效）
         原因必填，落两处（全流程可追溯）：
           1) 目标环节 remark 就地标注，2) 操作历史(action=step_rollback)
         """
@@ -435,7 +435,8 @@ class TaskService:
         （2026-09-22 用户反馈"改派后标题栏没变化"）。注意：任务字段→步骤方向的
         既有的级联重铺约定仍在（任务编辑时重铺全部步骤，未被本操作的局部改派覆写前有效）。
         开放范围即"非PL环节"：1/2为PL环节、9为双人共审(owner∪tse，见
-        list_tasks pending 特判与前端对应特判)、10为终态，均不开放。
+        list_tasks pending 特判与前端对应特判)兼末环，均不开放
+        （原"10为终态"随该环节裁撤自动退出本集合）。
         已完成(completed)环节不做改派；rejected(被打回待处理)保留可改派
         (打回即换人重来的场景)。审计动作 step_reassign 记新旧双名+级联说明。
         候选资格（2026-09-22 需求1/2）：目标责任人须持有该环节所属家族的项目角色
@@ -455,8 +456,8 @@ class TaskService:
         step = (await self.db.execute(stmt)).scalar_one_or_none()
         if not step or step.task_id != task_id:
             raise ValueError("环节不存在或不属于该任务")
-        if step.step in (1, 2, 9, 10):
-            raise ValueError(f"环节{step.step}为PL/双人共审/终态环节，不开放改派(仅3-8)")
+        if step.step in (1, 2, 9):
+            raise ValueError(f"环节{step.step}为PL/双人共审环节，不开放改派(仅3-8)")
         # 已完成环节不做改派（2026-09-22 用户约定：都完成了还改什么）；
         # rejected（被打回待处理）保留可改派——打回本就是"换人重来"的场景
         if step.status == StepStatus.completed.value:
@@ -579,21 +580,27 @@ class TaskService:
             if s.status == StepStatus.pending.value and current_step == 1:
                 current_step = s.step
         
-        # 如果全部完成
+        # 如果全部完成：终态锁定为 done——不再经过"末环步号查表"这一跳
+        # （历史背景：曾有第10步"任务结束"扛终态，裁撤后末环变为9，而9在做时是
+        # review——若继续 mapping[len(steps)] 会把全完成误判成 review 永不封卷）
         if completed == len(steps):
             current_step = len(steps)
             progress = 100
-        
+            task_status = TaskStatus.done.value
+        else:
+            task_status = self._get_status_by_step(current_step)
+
         # 更新任务
         stmt = update(TestTask).where(TestTask.id == task_id).values(
             progress=progress,
             current_step=current_step,
-            status=self._get_status_by_step(current_step)
+            status=task_status
         )
         await self.db.execute(stmt)
     
     def _get_status_by_step(self, step: int) -> str:
-        """根据步骤获取状态"""
+        """根据步骤获取状态（步骤1-9"在做"的阶段名；全完成走 _update_task_progress 直置 done，
+        原第10步"任务结束"扛终态的职责已由其接管）"""
         mapping = {
             1: TaskStatus.init.value,
             2: TaskStatus.design.value,
@@ -603,8 +610,7 @@ class TaskService:
             6: TaskStatus.testing.value,  # 测试用例分配
             7: TaskStatus.testing.value,  # 执行测试
             8: TaskStatus.testing.value,  # 测试完成
-            9: TaskStatus.review.value,    # 数据审核
-            10: TaskStatus.done.value,     # 任务结束
+            9: TaskStatus.review.value,    # 数据审核（末环）
         }
         return mapping.get(step, TaskStatus.init.value)
     
