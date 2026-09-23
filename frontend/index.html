@@ -1271,21 +1271,38 @@ async function doLogout() {
 
 document.getElementById('loginPassword').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
 
+// 只切壳不上数据:类别/侧栏高亮同步切换,不给任何网络请求——供 enterApp 首帧定向,
+// 消灭"先闪工作台再跳回目标视图"的过程感(数据随后由 switchView/openTask 灌入)
+function paintViewOnly(name) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.toggle('active', n.dataset.view === name));
+  const el = document.getElementById('view-' + name);
+  if (el) el.classList.add('active');
+}
+
 async function enterApp() {
   showApp();
   renderUser();
-  // 基础缓存先行:深链('#/taskDetail/81')的详情页依赖 userName() 渲染,须在其之前就绪
+  // ① 决策+显影先行(纯同步,首帧即目标视图,赶在浏览器下一次绘制之前——
+  //    修复 2026-09-23 用户反馈"每次刷新都先跳工作台再回来"的动画过程)
+  const h = parseViewHash();
+  const detailHit = !!(h && h.view === 'taskDetail' && h.id);
+  paintViewOnly(detailHit ? 'taskDetail' : ((h && NAV_VIEWS.indexOf(h.view) >= 0) ? h.view : 'dashboard'));
+  if (!h) setViewHash('dashboard');
+  // ② 基础缓存先行(userName 用于详情横幅,老顺序的确定性保留)
   await Promise.all([loadUsers(), loadProjects(), loadZentaoProducts(), loadZentaoProjects()]);
   await loadStats();
   await loadTasks();
-  // 按地址栏恢复视图,刷新/分享链接不再跌回工作台(2026-09-23 用户反馈);非法hash回落工作台
-  const h = parseViewHash();
-  let restored = false;
-  if (h && h.view === 'taskDetail' && h.id) {
-    try { await openTask(h.id); restored = !!currentTask; } catch (e) { restored = false; }
+  // ③ 灌数据。注意:此处必走 switchView/openTask 正规通道(viewLoader+hash+currentViewKey);
+  //    顺带修掉老路径的重复加载——旧代码尾部还要经历一次 dashboard 壳带来的二轮loadStats/loadTasks
+  if (detailHit) {
+    // 注意 openTask 自吞网络错(内部toast后return),外层catch接不到——以 currentTask 结果说话:
+    // 失效深链(任务被删/无权限)→ 已提示,壳回落工作台,与旧"restored"语义一致
+    try { await openTask(h.id); } finally {}
+    if (!(currentTask && currentTask.id === h.id)) switchView('dashboard');
+  } else {
+    switchView((h && NAV_VIEWS.indexOf(h.view) >= 0) ? h.view : 'dashboard', h && h.sub);
   }
-  if (!restored) switchView((h && NAV_VIEWS.indexOf(h.view) >= 0) ? h.view : 'dashboard', h && h.sub);
-  if (!restored && !h) setViewHash('dashboard');   // 无hash首次进入时补个规范地址
   renderGreeting();
 }
 
