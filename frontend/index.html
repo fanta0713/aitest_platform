@@ -499,31 +499,23 @@ tbody tr.clickable { cursor: pointer; }
         <div class="stat-card clickable" title="点击查看进行中任务列表" onclick="openStatCard('active')"><div class="icon" style="background:var(--success-bg);color:var(--success)">⚡</div><div><div class="num" id="statActive" style="color:var(--success)">0</div><div class="label" style="color:var(--success);font-weight:600">进行中</div></div><div class="chev">›</div></div>
         <div class="stat-card clickable" title="点击查看已完成任务列表" onclick="openStatCard('done')"><div class="icon" style="background:var(--warning-bg);color:var(--warning)">✔</div><div><div class="num" id="statDone" style="color:var(--warning)">0</div><div class="label" style="color:var(--warning);font-weight:600">已完成</div></div><div class="chev">›</div></div>
         <div class="stat-card clickable" title="点击查看未关闭问题单列表" onclick="openStatCard('issues')"><div class="icon" style="background:var(--danger-bg);color:var(--danger)">🐞</div><div><div class="num" id="statIssues" style="color:var(--danger)">0</div><div class="label" style="color:var(--danger);font-weight:600">未关闭问题</div></div><div class="chev">›</div></div>
+        <div class="stat-card clickable" title="超出结束日期的在飞任务(done/closed不入盘)" onclick="tbOpen('late')"><div class="icon" style="background:var(--danger-bg);color:var(--danger)">⏰</div><div><div class="num" id="tbLate" style="color:var(--danger)">0</div><div class="label" style="color:var(--danger);font-weight:600">已超期</div></div><div class="chev">›</div></div>
+        <div class="stat-card clickable" title="含今天在内3个自然日内到期的在飞任务(临期窗=今天+2,用户2026-09-23拍板)" onclick="tbOpen('soon')"><div class="icon" style="background:var(--warning-bg);color:var(--warning)">⏳</div><div><div class="num" id="tbSoon" style="color:var(--warning)">0</div><div class="label" style="color:var(--warning);font-weight:600">临期</div></div><div class="chev">›</div></div>
+        <div class="stat-card clickable" title="在飞且未超期、不在临期窗口内(归类只看日历轴,进度落后另见列表偏慢参考标)" onclick="tbOpen('ontime')"><div class="icon" style="background:var(--success-bg);color:var(--success)">✔</div><div><div class="num" id="tbOn" style="color:var(--success)">0</div><div class="label" style="color:var(--success);font-weight:600">进度正常</div></div><div class="chev">›</div></div>
+        <div class="stat-card clickable" title="未填写结束日期的任务,不计入三态,灰色常显提醒补数据" onclick="tbOpen('nosched')"><div class="icon" style="background:#f1f5f9;color:var(--text-sub)">○</div><div><div class="num" id="tbNs" style="color:var(--text-sub)">0</div><div class="label" style="color:var(--text-sub);font-weight:600">未排期</div></div><div class="chev">›</div></div>
       </div>
 <style id="tbStyles">
-.tb-wrap{display:flex;gap:12px;flex-wrap:wrap;margin:14px 0 14px}
-.tb-chip{flex:1;min-width:150px;background:#fff;border:1px solid var(--border);border-radius:10px;padding:12px 14px;display:flex;align-items:center;gap:10px;cursor:pointer;transition:transform .15s ease,box-shadow .15s ease}
-.tb-chip:hover{transform:translateY(-2px);box-shadow:0 4px 14px rgba(0,0,0,.10)}
-.tb-chip .tb-dot{width:10px;height:10px;border-radius:50%;flex:none}
-.tb-chip .num{font-size:22px;font-weight:700;line-height:1}
-.tb-chip .lab{font-size:12px;color:var(--text-sub);margin-top:3px}
-.tb-chev{margin-left:auto;color:var(--text-sub);opacity:.55;font-size:14px}
-.tb-chip:hover .tb-chev{color:var(--primary);opacity:1}
-.tb-hint{flex-basis:100%;text-align:right;font-size:11px;color:var(--text-sub);opacity:.75}
+/* 时序看板v2(2026-09-23用户:做得好丑): 撤自研tb-chip, 四卡收编进上方.stats-grid与首行同纲
+   (.stat-card.clickable解剖同源——彩底icon+大数字+label+chev全继承), 本段只剩弹层内辅样式+栅下hint */
+#tbScopeHint{text-align:right;font-size:11px;color:var(--text-sub);opacity:.75;margin:-2px 2px 12px}
 .tb-who{display:inline-block;background:var(--primary-light);color:var(--primary);border-radius:4px;padding:1px 6px;font-size:11px;margin:1px}
 .tb-exp{color:var(--text-sub);font-size:11px}
 .tb-name{max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .tb-dates{white-space:nowrap;font-size:12px;color:var(--text-sub)}
 .tb-modcnt{padding:10px 16px;border-bottom:1px solid var(--border);font-size:12px;color:var(--text-sub)}
 </style>
-<div class="tb-wrap" id="taskBoardWrap">
-  <div class="tb-chip" title="超出结束日期的在飞任务(done/closed不入盘)" onclick="tbOpen('late')"><span class="tb-dot" style="background:var(--danger)"></span><div><div class="num" id="tbLate" style="color:var(--danger)">0</div><div class="lab">已超期</div></div><div class="tb-chev">&rsaquo;</div></div>
-  <div class="tb-chip" title="含今天在内3个自然日内到期的在飞任务(临期窗=今天+2,用户2026-09-23拍板)" onclick="tbOpen('soon')"><span class="tb-dot" style="background:var(--warning)"></span><div><div class="num" id="tbSoon" style="color:var(--warning)">0</div><div class="lab">临期</div></div><div class="tb-chev">&rsaquo;</div></div>
-  <div class="tb-chip" title="在飞且未超期、不在临期窗口内的任务(仅供日历轴归类,进度落后另见列表偏慢标记)" onclick="tbOpen('ontime')"><span class="tb-dot" style="background:var(--success)"></span><div><div class="num" id="tbOn" style="color:var(--success)">0</div><div class="lab">进度正常</div></div><div class="tb-chev">&rsaquo;</div></div>
-  <div class="tb-chip" title="未填写结束日期的任务,不计入三态,灰色常显提醒补数据" onclick="tbOpen('nosched')"><span class="tb-dot" style="background:var(--text-sub)"></span><div><div class="num" id="tbNs" style="color:var(--text-sub)">0</div><div class="lab">未排期</div></div><div class="tb-chev">&rsaquo;</div></div>
-  <div class="tb-hint" id="tbScopeHint">&mdash;</div>
-</div>
-      <div class="card">
+<div id="tbScopeHint">—</div>
+<div class="card">
         <div class="card-head"><h3>最近任务</h3><button class="btn btn-sm" onclick="switchView('tasks')">查看全部</button></div>
         <table>
           <thead><tr><th>编号</th><th>任务名称</th><th>版本</th><th>进度</th><th>当前步骤</th><th>当前步骤负责人</th></tr></thead>
