@@ -1363,10 +1363,10 @@ function setViewHash(view, sub) {
 }
 
 function parseViewHash() {
-  // 三段制: #/视图[/子标识[/孙标识]] — caselib 用满三层: #/caselib/{库ID}/{模块ID(可-1未分类)}
-  const m = (window.location.hash || '').match(/^#\/(\w+)(?:\/([\w-]+))?(?:\/([\w-]+))?$/);
+  // 四段制: #/视图[/子[/孙[/重孙]]] — issues 吃满四层(产品/项目/任务/单列表),caselib 吃三层
+  const m = (window.location.hash || '').match(/^#\/(\w+)(?:\/([\w-]+))?(?:\/([\w-]+))?(?:\/([\w-]+))?$/);
   if (!m) return null;
-  const v = m[1], s = m[2], t = m[3];
+  const v = m[1], s = m[2], t = m[3], q = m[4];
   if (v === 'taskDetail') {
     return (s && /^\d+$/.test(s)) ? { view: 'taskDetail', id: parseInt(s, 10) } : null;
   }
@@ -1378,6 +1378,18 @@ function parseViewHash() {
       return r;
     }
     return { view: 'caselib' };   // 纯 #/caselib = 列表层(旧行为不变)
+  }
+  if (v === 'issues') {
+    // 全数字段逐级收紧:产品→项目→任务;任一层不合法即在该层截断(容错=浅层有效)
+    if (s && /^\d+$/.test(s)) {
+      const r = { view: 'issues', iprod: s };
+      if (t && /^\d+$/.test(t)) {
+        r.iproj = t;
+        if (q && /^\d+$/.test(q)) r.itask = q;
+      }
+      return r;
+    }
+    return { view: 'issues' };    // 纯 #/issues = 产品列表层(旧行为)
   }
   if (NAV_VIEWS.indexOf(v) >= 0) {
     return (v === 'mytasks' && s === 'done') ? { view: 'mytasks', sub: 'done' } : { view: v };
@@ -4870,6 +4882,15 @@ let issueNavProjectId = null;
 let issueNavTaskId = null;
 let issueTreeCache = null;
 
+// 问题单hash后缀与内存状态的唯一翻译官:任何层级 → 'P' | 'P/Q' | 'P/Q/T' | ''(产品列表)
+// (下钻/回退/恢复统一经此序列化,杜绝散落的字符串拼装各说各话)
+function issuesHashSuffix() {
+  if (issueNavLevel === 'products' || !issueNavProductId) return '';
+  if (issueNavLevel === 'projects' || !issueNavProjectId) return String(issueNavProductId);
+  if (issueNavLevel === 'tasks' || !issueNavTaskId) return issueNavProductId + '/' + issueNavProjectId;
+  return issueNavProductId + '/' + issueNavProjectId + '/' + issueNavTaskId;
+}
+
 async function loadIssueTree() {
   try {
     const data = await api('/api/tasks/issues/tree');
@@ -4878,6 +4899,26 @@ async function loadIssueTree() {
     document.getElementById('issueTreeOpen').textContent = `未关闭 ${data.open_count}`;
     issueNavLevel = 'products';
     issueNavProductId = issueNavProjectId = issueNavTaskId = null;
+    // 深链恢复(唯一恢复点,enterApp刷新与hashchange共用):按当前hash逐层校验、逐层深入,
+    // 断在哪层就停在哪层并用 issuesHashSuffix 把地址对齐到实际达成的层级(部分失链不漂移)
+    const hr = parseViewHash();
+    if (hr && hr.view === 'issues' && hr.iprod) {
+      const prod = (data.products || []).find(p => String(p.product_id) === String(hr.iprod));
+      if (prod) {
+        issueNavProductId = hr.iprod; issueNavLevel = 'projects';
+        const proj = (prod.projects || []).find(pr => String(pr.project_id) === String(hr.iproj));
+        if (hr.iproj && proj) {
+          issueNavProjectId = hr.iproj; issueNavLevel = 'tasks';
+          const tk = (proj.tasks || []).find(x => String(x.task_id) === String(hr.itask));
+          if (hr.itask && tk) { issueNavTaskId = hr.itask; issueNavLevel = 'issues'; }
+        }
+        if (currentViewKey === 'issues') setViewHash('issues', issuesHashSuffix());
+      } else {
+        // 产品都找不着(禅道侧下架/权限变化):留在产品列表,提示但不硬错
+        if (currentViewKey === 'issues') setViewHash('issues');
+        toast(`深链的问题单产品(ID:${hr.iprod})不存在或已变化，已回到产品列表`, true);
+      }
+    }
     renderIssueNav();
   } catch (e) {
     document.getElementById('issueBreadcrumb').innerHTML = `<span class="muted">加载失败：${esc(e.message)}</span>`;
@@ -4952,7 +4993,11 @@ function renderIssueNavProducts() {
   }).join('');
 }
 
-function enterIssueProduct(pid) { issueNavProductId = pid; issueNavLevel = 'projects'; renderIssueNav(); }
+function enterIssueProduct(pid) {
+  issueNavProductId = pid; issueNavLevel = 'projects';
+  if (currentViewKey === 'issues') setViewHash('issues', issuesHashSuffix());
+  renderIssueNav();
+}
 
 function renderIssueNavProjects() {
   const div = document.getElementById('issueNavProjects');
@@ -4969,7 +5014,11 @@ function renderIssueNavProjects() {
   }).join('') + `</div>`;
 }
 
-function enterIssueProject(pid) { issueNavProjectId = pid; issueNavLevel = 'tasks'; renderIssueNav(); }
+function enterIssueProject(pid) {
+  issueNavProjectId = pid; issueNavLevel = 'tasks';
+  if (currentViewKey === 'issues') setViewHash('issues', issuesHashSuffix());
+  renderIssueNav();
+}
 
 function renderIssueNavTasks() {
   const prod = (issueTreeCache.products || []).find(p => String(p.product_id) === String(issueNavProductId));
@@ -4996,11 +5045,28 @@ function renderIssueNavTasks() {
     </tr>`).join('');
 }
 
-function enterIssueTask(tid) { issueNavTaskId = tid; issueNavLevel = 'issues'; renderIssueNav(); }
+function enterIssueTask(tid) {
+  issueNavTaskId = tid; issueNavLevel = 'issues';
+  if (currentViewKey === 'issues') setViewHash('issues', issuesHashSuffix());
+  renderIssueNav();
+}
 
-function backToIssueProducts() { issueNavLevel = 'products'; issueNavProductId = issueNavProjectId = issueNavTaskId = null; renderIssueNav(); }
-function backToIssueProjects() { issueNavLevel = 'projects'; issueNavProjectId = issueNavTaskId = null; renderIssueNav(); }
-function backToIssueTasks() { issueNavLevel = 'tasks'; issueNavTaskId = null; renderIssueNav(); }
+// 回退三段:setState → 统一经 issuesHashSuffix 落账(子段自动收缩) → 重渲染
+function backToIssueProducts() {
+  issueNavLevel = 'products'; issueNavProductId = issueNavProjectId = issueNavTaskId = null;
+  if (currentViewKey === 'issues') setViewHash('issues', issuesHashSuffix());
+  renderIssueNav();
+}
+function backToIssueProjects() {
+  issueNavLevel = 'projects'; issueNavProjectId = issueNavTaskId = null;
+  if (currentViewKey === 'issues') setViewHash('issues', issuesHashSuffix());
+  renderIssueNav();
+}
+function backToIssueTasks() {
+  issueNavLevel = 'tasks'; issueNavTaskId = null;
+  if (currentViewKey === 'issues') setViewHash('issues', issuesHashSuffix());
+  renderIssueNav();
+}
 
 const ISSUE_STATUS_LABEL = {open:'待处理',fixed:'已解决'};
 const ISSUE_STATUS_ORDER = ['open','fixed'];
