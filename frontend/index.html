@@ -5230,6 +5230,8 @@ async function updateIssueStatus(issueId, status) {
       }
     }
     renderIssueList();
+    // 弹层如果开着,行数/状态就地重算重显(保持卡片数字=行数的承诺)
+    if (document.getElementById('statModal').classList.contains('show') && window._statLastKind) openStatCard(window._statLastKind);
     toast(`状态已更新为「${ISSUE_STATUS_LABEL[status] || status}」`);
   } catch (e) { toast(e.message, true); }
 }
@@ -5284,6 +5286,7 @@ function openStatCard(kind) {
   const body = document.getElementById('statModalBody');
   let html = '';
 
+  window._statLastKind = kind;  // 弹层开着改状态,即时重算重显(updateIssueStatus尾部挂钩)
   if (kind === 'issues') {
     // 走 issuesTree 缓存按四段层级一路收集(树本身就是权威序)
     const rows = [];
@@ -5294,14 +5297,17 @@ function openStatCard(kind) {
             if (['open', 'assigned'].includes(i.status)) rows.push({ i, p, pr, tk });
     html = !rows.length
       ? `<div class="empty" style="padding:26px">${meta.empty}</div>`
-      : `<table><thead><tr><th>问题单号</th><th>标题</th><th>级别</th><th>所属</th><th>状态</th></tr></thead><tbody>` +
+      : `// 列属性与问题单栏第四节列表严格同款(问题单号/关联用例ID/提单人/提单日期/状态),级别撤职;
+      // 所属三级路径为跨任务聚合的导航信息垫后,不算单据属性
+      <table><thead><tr><th>问题单号</th><th>关联用例ID</th><th>提单人</th><th>提单日期</th><th>状态</th><th>所属</th></tr></thead><tbody>` +
         rows.map(({i,p,pr,tk}) => `
-          <tr class="clickable" title="点击直达该问题单所在任务" onclick="jumpToIssue(${p.product_id},${pr.project_id},${tk.task_id})">
-            <td style="font-family:monospace;font-weight:600;color:var(--primary);white-space:nowrap">${esc(i.issue_no || i.bug_no)}</td>
-            <td style="max-width:230px;word-break:break-all">${esc(i.title)}</td>
-            <td><span class="badge ${(SEV_MAP[i.severity] || ['', 'badge-gray'])[1]}" style="font-size:11px">${(SEV_MAP[i.severity] || [i.severity])[0]}</span></td>
+          <tr>
+            <td style="font-family:monospace;font-weight:600;white-space:nowrap;cursor:pointer" title="点击直达该问题单所在任务" onclick="jumpToIssue(${p.product_id},${pr.project_id},${tk.task_id})">${esc(i.issue_no || i.bug_no)}</td>
+            <td>${i.case_link_id ? `<span style="font-family:monospace">#${i.case_link_id}</span>${i.case_title ? ` <span class="muted" style="font-size:12px">${esc(i.case_title)}</span>` : ''}` : '<span class="muted">—</span>'}</td>
+            <td>${esc(i.reporter_name || '—')}</td>
+            <td class="muted" style="font-size:12px;white-space:nowrap">${(i.created_at || '').slice(0, 10)}</td>
+            <td><span class="badge ${issueStatusBadge(i.status)}" style="cursor:${canEditIssue(i)?'pointer':'default'};${canEditIssue(i)?'':'opacity:.85'}" title="${canEditIssue(i)?'点击修改状态':`仅提单人可修改（${esc(i.reporter_name||'提单人')}）`}" ${canEditIssue(i)?`onclick="openIssueStatusMenu(${i.id}, this, '${i.status}')"`:''}>${ISSUE_STATUS_LABEL[i.status] || i.status}</span></td>
             <td class="muted" style="font-size:12px;max-width:210px;word-break:break-all">${esc(p.product_name)} ▸ ${esc(pr.project_name)} ▸ ${esc(tk.task_name)}</td>
-            <td><span class="badge ${issueStatusBadge(i.status)}">${ISSUE_STATUS_LABEL[i.status] || i.status}</span></td>
           </tr>`).join('') +
         '</tbody></table>';
   } else {
