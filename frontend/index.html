@@ -472,10 +472,10 @@ tbody tr.clickable { cursor: pointer; }
         <button class="btn btn-primary" id="dashCreateBtn" onclick="openCreateModal()" style="display:none">+ 发起测试任务</button>
       </div>
       <div class="stats-grid">
-        <div class="stat-card"><div class="icon" style="background:var(--primary-light);color:var(--primary)">📋</div><div><div class="num" id="statTotal">0</div><div class="label">任务总数</div></div></div>
-        <div class="stat-card"><div class="icon" style="background:var(--success-bg);color:var(--success)">⚡</div><div><div class="num" id="statActive">0</div><div class="label">进行中</div></div></div>
-        <div class="stat-card"><div class="icon" style="background:var(--warning-bg);color:var(--warning)">✔</div><div><div class="num" id="statDone">0</div><div class="label">已完成</div></div></div>
-        <div class="stat-card"><div class="icon" style="background:var(--danger-bg);color:var(--danger)">🐞</div><div><div class="num" id="statIssues">0</div><div class="label">未关闭问题</div></div></div>
+        <div class="stat-card" style="cursor:pointer" title="点击查看全部任务列表" onclick="openStatCard('total')"><div class="icon" style="background:var(--primary-light);color:var(--primary)">📋</div><div><div class="num" id="statTotal">0</div><div class="label">任务总数</div></div></div>
+        <div class="stat-card" style="cursor:pointer" title="点击查看进行中任务列表" onclick="openStatCard('active')"><div class="icon" style="background:var(--success-bg);color:var(--success)">⚡</div><div><div class="num" id="statActive">0</div><div class="label">进行中</div></div></div>
+        <div class="stat-card" style="cursor:pointer" title="点击查看已完成任务列表" onclick="openStatCard('done')"><div class="icon" style="background:var(--warning-bg);color:var(--warning)">✔</div><div><div class="num" id="statDone">0</div><div class="label">已完成</div></div></div>
+        <div class="stat-card" style="cursor:pointer" title="点击查看未关闭问题单列表" onclick="openStatCard('issues')"><div class="icon" style="background:var(--danger-bg);color:var(--danger)">🐞</div><div><div class="num" id="statIssues">0</div><div class="label">未关闭问题</div></div></div>
       </div>
       <div class="card">
         <div class="card-head"><h3>最近任务</h3><button class="btn btn-sm" onclick="switchView('tasks')">查看全部</button></div>
@@ -837,6 +837,13 @@ tbody tr.clickable { cursor: pointer; }
   </div>
 
 <!-- 问题单状态修改下拉菜单 -->
+<!-- 工作台统计卡下钻列表(2026-09-23: 用户"放在那里也没什么用"→即点即看;纯前端缓存装配零后端;弹层为临时态不落hash,F5消亡属有意) -->
+<div class="modal-mask" id="statModal">
+  <div class="modal" style="width:760px">
+    <div class="modal-head"><h3 id="statModalTitle">—</h3><button class="modal-close" onclick="closeModal('statModal')">×</button></div>
+    <div class="modal-body" id="statModalBody" style="padding:0"></div>
+  </div>
+</div>
 <div id="issueStatusMenu" style="display:none;position:fixed;z-index:400;background:#fff;border:1px solid var(--border);border-radius:8px;box-shadow:0 8px 28px rgba(15,23,42,.18);min-width:148px;padding:4px"></div>
 
 <!-- 添加成员弹窗 -->
@@ -5255,6 +5262,75 @@ async function openCreateModal() {
   fillProjectSelect(defaultProdId);
   document.getElementById('createModal').classList.add('show');
 }
+// ============ 工作台四卡点开列表(2026-09-23) ============
+// 卡片数字与列表行数同源的口径锚——两处互指,漂移即见:
+//   total/active/done ←→ 后端 get_stats(非软删;active=非done/closed)
+//   issues            ←→ 后端 issues/tree open_count(open/assigned,改动9口径)
+const STAT_CARD_META = {
+  total:  { title: '全部任务', empty: '暂无任务' },
+  active: { title: '进行中的任务', empty: '暂无进行中的任务' },
+  done:   { title: '已完成的任务', empty: '暂无已完成的任务' },
+  issues: { title: '未关闭的问题单', empty: '太干净了，没有未关闭的问题单' },
+};
+
+function openStatCard(kind) {
+  const meta = STAT_CARD_META[kind]; if (!meta) return;
+  document.getElementById('statModalTitle').textContent = meta.title;
+  const body = document.getElementById('statModalBody');
+  let html = '';
+
+  if (kind === 'issues') {
+    // 走 issuesTree 缓存按四段层级一路收集(树本身就是权威序)
+    const rows = [];
+    for (const p of (issueTreeCache.products || []))
+      for (const pr of (p.projects || []))
+        for (const tk of (pr.tasks || []))
+          for (const i of (tk.issues || []))
+            if (['open', 'assigned'].includes(i.status)) rows.push({ i, p, pr, tk });
+    html = !rows.length
+      ? `<div class="empty" style="padding:26px">${meta.empty}</div>`
+      : `<table><thead><tr><th>问题单号</th><th>标题</th><th>级别</th><th>所属</th><th>状态</th></tr></thead><tbody>` +
+        rows.map(({i,p,pr,tk}) => `
+          <tr class="clickable" title="点击直达该问题单所在任务" onclick="jumpToIssue(${p.product_id},${pr.project_id},${tk.task_id})">
+            <td style="font-family:monospace;font-weight:600;color:var(--primary);white-space:nowrap">${esc(i.issue_no || i.bug_no)}</td>
+            <td style="max-width:230px;word-break:break-all">${esc(i.title)}</td>
+            <td><span class="badge ${(SEV_MAP[i.severity] || ['', 'badge-gray'])[1]}" style="font-size:11px">${(SEV_MAP[i.severity] || [i.severity])[0]}</span></td>
+            <td class="muted" style="font-size:12px;max-width:210px;word-break:break-all">${esc(p.product_name)} ▸ ${esc(pr.project_name)} ▸ ${esc(tk.task_name)}</td>
+            <td><span class="badge ${issueStatusBadge(i.status)}">${ISSUE_STATUS_LABEL[i.status] || i.status}</span></td>
+          </tr>`).join('') +
+        '</tbody></table>';
+  } else {
+    // 与后端 get_stats 逐字面对齐:active=非(done|closed),done=done/closed;allTasksCache 本就不含软删
+    const isIn = (kind === 'done') ? ((s) => ['done','closed'].includes(s))
+               : (kind === 'active') ? ((s) => !['done','closed'].includes(s))
+               : (() => true);
+    const rows = (allTasksCache || []).filter(tt => isIn(tt.status));
+    html = !rows.length
+      ? `<div class="empty" style="padding:26px">${meta.empty}</div>`
+      : `<table><thead><tr><th>编号</th><th>任务名称</th><th>所属产品 / 项目</th><th>进度</th><th>当前步骤</th></tr></thead><tbody>` +
+        rows.map(tt => `
+          <tr class="clickable" title="点击进入任务详情" onclick="openTask(${tt.id})">
+            <td style="font-family:monospace;color:var(--primary);font-weight:600;font-size:12px;white-space:nowrap">${esc(tt.code)}</td>
+            <td style="font-weight:500;max-width:240px;word-break:break-all">${esc(tt.name)}</td>
+            <td class="muted" style="font-size:12px;max-width:200px;word-break:break-all">${esc(tt.product_name || '—')} ▸ ${esc(tt.project_name || '—')}</td>
+            <td style="min-width:90px"><div style="display:flex;align-items:center;gap:8px"><div style="flex:1;height:6px;background:#e2e8f0;border-radius:3px;overflow:hidden"><div style="width:${tt.progress}%;height:100%;background:var(--primary)"></div></div><span style="font-size:12px;color:var(--text-sub)">${tt.progress}%</span></div></td>
+            <td><span class="badge badge-gray" style="font-size:11px;white-space:nowrap">${tt.current_step}. ${esc(STEP_NAMES[tt.current_step-1] || '—')}</span></td>
+          </tr>`).join('') +
+        '</tbody></table>';
+  }
+  body.innerHTML = html;
+  document.getElementById('statModal').classList.add('show');
+}
+
+// 问题单行点击 → 直接落四级深链再 switchView:loadIssueTree 的同步段快照(d16e178竞态防线)
+// 会拾起这个hash,恢复块在树缓存上就地校验并直达深层;hash先被switchView通配分支重置也无妨,
+// 恢复块的 currentViewKey 守卫段落会用 issuesHashSuffix 把地址再次扶正——全程零新发明
+function jumpToIssue(pid, qid, tid) {
+  closeModal('statModal');
+  setViewHash('issues', [pid, qid, tid].join('/'));
+  switchView('issues');
+}
+
 function closeModal(id) {
   const el = document.getElementById(id);
   el.classList.remove('show');
