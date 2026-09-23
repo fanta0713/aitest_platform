@@ -501,7 +501,7 @@ tbody tr.clickable { cursor: pointer; }
         <div class="stat-card clickable" title="点击查看已完成任务列表" onclick="openStatCard('done')"><div class="icon" style="background:var(--warning-bg);color:var(--warning)">✔</div><div><div class="num" id="statDone" style="color:var(--warning)">0</div><div class="label" style="color:var(--warning);font-weight:600">已完成</div></div><div class="chev">›</div></div>
         <div class="stat-card clickable" title="点击查看未关闭问题单列表" onclick="openStatCard('issues')"><div class="icon" style="background:var(--danger-bg);color:var(--danger)">🐞</div><div><div class="num" id="statIssues" style="color:var(--danger)">0</div><div class="label" style="color:var(--danger);font-weight:600">未关闭问题</div></div><div class="chev">›</div></div>
       </div>
-      <div class="tb-seg"><span class="tb-seg-t">任务时序</span><span class="tb-seg-d">按结束日期动态判定 · 已完成/已关闭不参与 · 未排期需补数据</span><span id="tbScopeHint">—</span></div>
+      <div class="tb-seg"><span class="tb-seg-t">任务时序</span><span id="tbScopeHint">—</span></div>
       <div class="stats-grid">
         <div class="stat-card clickable" title="超出结束日期的在飞任务(done/closed不入盘)" onclick="tbOpen('late')"><div class="icon" style="background:var(--danger-bg);color:var(--danger)">⏰</div><div><div class="num" id="tbLate" style="color:var(--danger)">0</div><div class="label" style="color:var(--danger);font-weight:600">已超期</div></div><div class="chev">›</div></div>
         <div class="stat-card clickable" title="含今天在内3个自然日内到期的在飞任务(临期窗=今天+2,用户2026-09-23拍板)" onclick="tbOpen('soon')"><div class="icon" style="background:var(--warning-bg);color:var(--warning)">⏳</div><div><div class="num" id="tbSoon" style="color:var(--warning)">0</div><div class="label" style="color:var(--warning);font-weight:600">临期</div></div><div class="chev">›</div></div>
@@ -513,7 +513,6 @@ tbody tr.clickable { cursor: pointer; }
    (.stat-card.clickable解剖同源——彩底icon+大数字+label+chev全继承), 本段只剩弹层内辅样式+栅下hint */
 .tb-seg{display:flex;align-items:baseline;gap:10px;margin:20px 2px 12px}
 .tb-seg-t{font-size:15px;font-weight:700}
-.tb-seg-d{font-size:12px;color:var(--text-sub)}
 #tbScopeHint{margin-left:auto;font-size:11px;color:var(--text-sub);opacity:.75;font-weight:400}
 .tb-who{display:inline-block;background:var(--primary-light);color:var(--primary);border-radius:4px;padding:1px 6px;font-size:11px;margin:1px}
 .tb-exp{color:var(--text-sub);font-size:11px}
@@ -5367,9 +5366,7 @@ function openStatCard(kind) {
             if (['open', 'assigned'].includes(i.status)) rows.push({ i, p, pr, tk });
     html = !rows.length
       ? `<div class="empty" style="padding:26px">${meta.empty}</div>`
-      : `// 列属性与问题单栏第四节列表严格同款(问题单号/关联用例ID/提单人/提单日期/状态),级别撤职;
-      // 所属三级路径为跨任务聚合的导航信息垫后,不算单据属性
-      <table><thead><tr><th>问题单号</th><th>关联用例ID</th><th>提单人</th><th>提单日期</th><th>状态</th><th>所属</th></tr></thead><tbody>` +
+      : `<table><thead><tr><th>问题单号</th><th>关联用例ID</th><th>提单人</th><th>提单日期</th><th>状态</th><th>所属</th></tr></thead><tbody>` +
         rows.map(({i,p,pr,tk}) => `
           <tr>
             <td style="font-family:monospace;font-weight:600;white-space:nowrap;cursor:pointer" title="点击直达该问题单所在任务" onclick="jumpToIssue(${p.product_id},${pr.project_id},${tk.task_id})">${esc(i.issue_no || i.bug_no)}</td>
@@ -5602,8 +5599,8 @@ function tbRefresh() { // 全量重算四数+视角角标; 非工作台壳(tbLat
   document.getElementById('tbOn').textContent = c.ontime;
   document.getElementById('tbNs').textContent = c.nosched;
   document.getElementById('tbScopeHint').textContent = tbGlobalView()
-    ? ('全局视野 ' + scoped.length + ' 项 · PL/TSE/admin 可见所有任务')
-    : ('名下视野 ' + scoped.length + ' 项 · 只看当前环节在自己名下的任务');
+    ? ('全局视野 ' + scoped.length + ' 项')
+    : ('名下视野 ' + scoped.length + ' 项');
 }
 const TB_META = {
   late:    ['已超期任务', 'var(--danger)', '超出结束日期的在飞任务'],
