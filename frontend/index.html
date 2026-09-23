@@ -500,6 +500,29 @@ tbody tr.clickable { cursor: pointer; }
         <div class="stat-card clickable" title="点击查看已完成任务列表" onclick="openStatCard('done')"><div class="icon" style="background:var(--warning-bg);color:var(--warning)">✔</div><div><div class="num" id="statDone" style="color:var(--warning)">0</div><div class="label" style="color:var(--warning);font-weight:600">已完成</div></div><div class="chev">›</div></div>
         <div class="stat-card clickable" title="点击查看未关闭问题单列表" onclick="openStatCard('issues')"><div class="icon" style="background:var(--danger-bg);color:var(--danger)">🐞</div><div><div class="num" id="statIssues" style="color:var(--danger)">0</div><div class="label" style="color:var(--danger);font-weight:600">未关闭问题</div></div><div class="chev">›</div></div>
       </div>
+<style id="tbStyles">
+.tb-wrap{display:flex;gap:12px;flex-wrap:wrap;margin:14px 0 14px}
+.tb-chip{flex:1;min-width:150px;background:#fff;border:1px solid var(--border);border-radius:10px;padding:12px 14px;display:flex;align-items:center;gap:10px;cursor:pointer;transition:transform .15s ease,box-shadow .15s ease}
+.tb-chip:hover{transform:translateY(-2px);box-shadow:0 4px 14px rgba(0,0,0,.10)}
+.tb-chip .tb-dot{width:10px;height:10px;border-radius:50%;flex:none}
+.tb-chip .num{font-size:22px;font-weight:700;line-height:1}
+.tb-chip .lab{font-size:12px;color:var(--text-sub);margin-top:3px}
+.tb-chev{margin-left:auto;color:var(--text-sub);opacity:.55;font-size:14px}
+.tb-chip:hover .tb-chev{color:var(--primary);opacity:1}
+.tb-hint{flex-basis:100%;text-align:right;font-size:11px;color:var(--text-sub);opacity:.75}
+.tb-who{display:inline-block;background:var(--primary-light);color:var(--primary);border-radius:4px;padding:1px 6px;font-size:11px;margin:1px}
+.tb-exp{color:var(--text-sub);font-size:11px}
+.tb-name{max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tb-dates{white-space:nowrap;font-size:12px;color:var(--text-sub)}
+.tb-modcnt{padding:10px 16px;border-bottom:1px solid var(--border);font-size:12px;color:var(--text-sub)}
+</style>
+<div class="tb-wrap" id="taskBoardWrap">
+  <div class="tb-chip" title="超出结束日期的在飞任务(done/closed不入盘)" onclick="tbOpen('late')"><span class="tb-dot" style="background:var(--danger)"></span><div><div class="num" id="tbLate" style="color:var(--danger)">0</div><div class="lab">已超期</div></div><div class="tb-chev">&rsaquo;</div></div>
+  <div class="tb-chip" title="含今天在内3个自然日内到期的在飞任务(临期窗=今天+2,用户2026-09-23拍板)" onclick="tbOpen('soon')"><span class="tb-dot" style="background:var(--warning)"></span><div><div class="num" id="tbSoon" style="color:var(--warning)">0</div><div class="lab">临期</div></div><div class="tb-chev">&rsaquo;</div></div>
+  <div class="tb-chip" title="在飞且未超期、不在临期窗口内的任务(仅供日历轴归类,进度落后另见列表偏慢标记)" onclick="tbOpen('ontime')"><span class="tb-dot" style="background:var(--success)"></span><div><div class="num" id="tbOn" style="color:var(--success)">0</div><div class="lab">进度正常</div></div><div class="tb-chev">&rsaquo;</div></div>
+  <div class="tb-chip" title="未填写结束日期的任务,不计入三态,灰色常显提醒补数据" onclick="tbOpen('nosched')"><span class="tb-dot" style="background:var(--text-sub)"></span><div><div class="num" id="tbNs" style="color:var(--text-sub)">0</div><div class="lab">未排期</div></div><div class="tb-chev">&rsaquo;</div></div>
+  <div class="tb-hint" id="tbScopeHint">&mdash;</div>
+</div>
       <div class="card">
         <div class="card-head"><h3>最近任务</h3><button class="btn btn-sm" onclick="switchView('tasks')">查看全部</button></div>
         <table>
@@ -1781,6 +1804,7 @@ async function loadTasks() {
   try {
     const data = await api('/api/tasks');
     allTasksCache = data.items;
+  tbRefresh(); // 任务时序看板: 数据一落地即重算(2026-09-23改动14)
   } catch (e) { return; }
   renderRecent(allTasksCache.slice(0, 6));
   // 深链恢复(唯一恢复点,enterApp刷新与hashchange共用):按入口快照逐层校验、逐层深入,
@@ -5521,6 +5545,122 @@ function sfCheckAll(col, on){
 // 问题单行点击 → 直接落四级深链再 switchView:loadIssueTree 的同步段快照(d16e178竞态防线)
 // 会拾起这个hash,恢复块在树缓存上就地校验并直达深层;hash先被switchView通配分支重置也无妨,
 // 恢复块的 currentViewKey 守卫段落会用 issuesHashSuffix 把地址再次扶正——全程零新发明
+// ==================== 任务时序看板(2026-09-23改动14: 用户"分角色展示哪些任务临期/超期/正常") ====================
+// 口径唯一出处: 三态+未排期都在tbEval; 时间轴只有任务级begin~end(环节表begin/end是实际时间非计划,不判环节超期)
+// 视角: 登录currentUser.roles含pl/tse(或admin)即全局(auth.py:82官方源); 否则名下(owner/tse_id/version_owner/executor_id)
+const TB_LEAD_DAYS = 2, TB_SLOW_GAP = 25; // 临期窗右沿=今天+2(含今天共3天); 偏慢=落后>=25pp(用户拍板)
+function tbToday() { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), d.getDate()); }
+function tbDaysLeft(t) {
+  if (!t || !t.end_date) return null;
+  const a = String(t.end_date).split('-').map(Number);
+  if (a.length < 3 || !a[0]) return null;
+  return Math.round((new Date(a[0], a[1] - 1, a[2]) - tbToday()) / 86400000);
+}
+function tbExpProg(t) { // 期望进度=已走过日历占比; 无起止或不构成区间返回null(不判偏慢)
+  if (!t || !t.begin_date || !t.end_date) return null;
+  const pb = String(t.begin_date).split('-'), pe = String(t.end_date).split('-');
+  if (pb.length < 3 || pe.length < 3) return null;
+  const b = new Date(pb[0], pb[1] - 1, pb[2]).getTime(), e = new Date(pe[0], pe[1] - 1, pe[2]).getTime();
+  if (!(e > b)) return 0;
+  return Math.round(Math.min(Math.max((tbToday().getTime() - b) / (e - b), 0), 1) * 100);
+}
+function tbEval(t) { // 三态+未排期分类器:{bucket,days,exp,gap}; 完结态不入盘(与get_stats的active=非done/closed同源)
+  if (t.status === 'done' || t.status === 'closed') return { bucket: 'finished' };
+  const dl = tbDaysLeft(t), exp = tbExpProg(t);
+  const gap = (exp == null) ? null : (exp - (t.progress || 0));
+  if (dl == null) return { bucket: 'nosched', days: null, exp: exp, gap: gap };
+  if (dl < 0) return { bucket: 'late', days: dl, exp: exp, gap: gap };        // 超期: 今天>end_date
+  if (dl <= TB_LEAD_DAYS) return { bucket: 'soon', days: dl, exp: exp, gap: gap }; // 临期: 0<=差<=2
+  return { bucket: 'ontime', days: dl, exp: exp, gap: gap };
+}
+function tbEsc(x) { return String(x == null ? '' : x).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+function tbMine(t) {
+  const u = currentUser; if (!u) return false;
+  return t.owner === u.id || t.tse_id === u.id || t.version_owner === u.id || t.executor_id === u.id;
+}
+function tbGlobalView() { // PL/TSE全局视角(用户原话); admin天然全局
+  const rs = (currentUser && currentUser.roles) || [];
+  return rs.indexOf('pl') >= 0 || rs.indexOf('tse') >= 0 ||
+    (currentUser && (currentUser.is_admin || rs.indexOf('admin') >= 0));
+}
+function tbScope() {
+  const src = Array.isArray(allTasksCache) ? allTasksCache : [];
+  return tbGlobalView() ? src : src.filter(tbMine);
+}
+function tbRefresh() { // 全量重算四数+视角角标; 非工作台壳(tbLate不存在)静默跳过
+  const elLate = document.getElementById('tbLate'); if (!elLate) return;
+  if (!Array.isArray(allTasksCache)) return;
+  const scoped = tbScope(), c = { late: 0, soon: 0, ontime: 0, nosched: 0 };
+  scoped.forEach(function (t) { const b = tbEval(t).bucket; if (c[b] != null) c[b]++; });
+  elLate.textContent = c.late;
+  document.getElementById('tbSoon').textContent = c.soon;
+  document.getElementById('tbOn').textContent = c.ontime;
+  document.getElementById('tbNs').textContent = c.nosched;
+  document.getElementById('tbScopeHint').textContent = tbGlobalView()
+    ? ('全局视野 ' + scoped.length + ' 项 · PL/TSE/admin 可见所有任务')
+    : ('名下视野 ' + scoped.length + ' 项 · 版本负责人/测试执行只看自己的任务');
+}
+const TB_META = {
+  late:    ['已超期任务', 'var(--danger)', '超出结束日期的在飞任务'],
+  soon:    ['临期任务(3日内到期)', 'var(--warning)', '含今天在内,3个自然日内到期的在飞任务'],
+  ontime:  ['进度正常任务', 'var(--success)', '在飞且未超期、不在临期窗口内'],
+  nosched: ['未排期任务', 'var(--text-sub)', '未填写结束日期,不计入三态']
+};
+function tbFmtD(v) { return v ? String(v) : '&mdash;'; }
+function tbRow(e) {
+  const t = e.t, who = [];
+  if (t.owner != null) who.push('<span class="tb-who">' + tbEsc(userName(t.owner)) + '</span>');
+  if (t.tse_id != null) who.push('<span class="tb-who">TSE&middot;' + tbEsc(userName(t.tse_id)) + '</span>');
+  if (t.version_owner != null) who.push('<span class="tb-who">版&middot;' + tbEsc(userName(t.version_owner)) + '</span>');
+  if (t.executor_id != null) who.push('<span class="tb-who">执&middot;' + tbEsc(userName(t.executor_id)) + '</span>');
+  const dlTxt = e.days == null ? '<span class="badge badge-gray">未排期</span>'
+    : e.days < 0 ? '<span class="badge badge-red">超期 ' + (-e.days) + ' 天</span>'
+    : e.days === 0 ? '<span class="badge badge-amber">今天到期</span>'
+    : '<span class="badge badge-green">剩 ' + e.days + ' 天</span>';
+  const slow = (e.gap != null && e.gap >= TB_SLOW_GAP)
+    ? ' <span class="badge badge-amber" title="期望' + e.exp + '%、实际落后' + e.gap + '个百分点(阈值' + TB_SLOW_GAP + 'pp,用户拍板)">偏慢' + e.gap + 'pp</span>'
+    : '';
+  const progTxt = (t.progress || 0) + '%' +
+    (e.exp != null ? '<span class="tb-exp"> / 期望 ' + e.exp + '%</span>' : '') + slow;
+  return '<tr style="cursor:pointer" onclick="openTask(' + t.id + ')" title="点击进入任务详情">'
+    + '<td>' + tbEsc(t.code) + '</td>'
+    + '<td class="tb-name" title="' + tbEsc(t.name) + '">' + tbEsc(t.name) + '</td>'
+    + '<td>' + tbEsc(t.product_name) + '</td>'
+    + '<td>' + who.join(' ') + '</td>'
+    + '<td class="tb-dates">' + tbFmtD(t.begin_date) + ' ~ ' + tbFmtD(t.end_date) + '</td>'
+    + '<td>' + dlTxt + '</td>'
+    + '<td>' + progTxt + '</td></tr>';
+}
+function tbOpen(kind) { // 列表弹层,复用statModal基建(关闭 hygiene 与 Excel筛选家族同款)
+  closeStatFilter();
+  const meta = TB_META[kind];
+  document.getElementById('statModalTitle').innerHTML =
+    '<span style="color:' + meta[1] + '">●</span> ' + meta[0] +
+    ' <span class="tb-exp">' + meta[2] + '</span>';
+  const body = document.getElementById('statModalBody');
+  if (!Array.isArray(allTasksCache)) {
+    body.innerHTML = '<div class="empty" style="padding:26px">任务数据尚未装载,请稍后再试或刷新页面</div>';
+    document.getElementById('statModal').classList.add('show');
+    return;
+  }
+  const scoped = tbScope();
+  let rows = [];
+  scoped.forEach(function (t) { const e = tbEval(t); if (e.bucket === kind) { e.t = t; rows.push(e); } });
+  rows.sort(function (a, b) { // 超期:超得多靠前; 临期/正常:剩得少靠前; 未排期保持原序
+    if (a.days == null && b.days == null) return 0;
+    if (a.days == null) return 1;
+    if (b.days == null) return -1;
+    return a.days - b.days;
+  });
+  const inner = rows.length
+    ? '<table><thead><tr><th>编号</th><th>任务名称</th><th>产品</th><th>负责人</th><th>起止日期</th><th>剩余</th><th>进度</th></tr></thead><tbody>'
+      + rows.map(tbRow).join('') + '</tbody></table>'
+    : '<div class="empty" style="padding:26px">当前没有' + meta[0] + '</div>';
+  body.innerHTML = '<div class="tb-modcnt">匹配 ' + rows.length + ' / 视野 ' + scoped.length + ' 项('
+    + (tbGlobalView() ? '全局' : '名下') + ')</div>' + inner;
+  document.getElementById('statModal').classList.add('show');
+}
+
 function jumpToIssue(pid, qid, tid) {
   closeModal('statModal');
   setViewHash('issues', [pid, qid, tid].join('/'));
