@@ -494,7 +494,8 @@ tbody tr.clickable { cursor: pointer; }
         <div><h2>工作台</h2><div class="desc" id="greeting"></div></div>
         <button class="btn btn-primary" id="dashCreateBtn" onclick="openCreateModal()" style="display:none">+ 发起测试任务</button>
       </div>
-      <div class="stats-grid">
+            <div class="tb-seg"><span class="tb-seg-t">任务总览</span></div>
+<div class="stats-grid">
         <div class="stat-card clickable" title="点击查看全部任务列表" onclick="openStatCard('total')"><div class="icon" style="background:var(--primary-light);color:var(--primary)">📋</div><div><div class="num" id="statTotal" style="color:var(--primary)">0</div><div class="label" style="color:var(--primary);font-weight:600">任务总数</div></div><div class="chev">›</div></div>
         <div class="stat-card clickable" title="点击查看进行中任务列表" onclick="openStatCard('active')"><div class="icon" style="background:var(--success-bg);color:var(--success)">⚡</div><div><div class="num" id="statActive" style="color:var(--success)">0</div><div class="label" style="color:var(--success);font-weight:600">进行中</div></div><div class="chev">›</div></div>
         <div class="stat-card clickable" title="点击查看已完成任务列表" onclick="openStatCard('done')"><div class="icon" style="background:var(--warning-bg);color:var(--warning)">✔</div><div><div class="num" id="statDone" style="color:var(--warning)">0</div><div class="label" style="color:var(--warning);font-weight:600">已完成</div></div><div class="chev">›</div></div>
@@ -510,7 +511,7 @@ tbody tr.clickable { cursor: pointer; }
 <style id="tbStyles">
 /* 时序看板v2(2026-09-23用户:做得好丑): 撤自研tb-chip, 四卡收编进上方.stats-grid与首行同纲
    (.stat-card.clickable解剖同源——彩底icon+大数字+label+chev全继承), 本段只剩弹层内辅样式+栅下hint */
-.tb-seg{display:flex;align-items:baseline;gap:10px;margin:18px 2px -4px}
+.tb-seg{display:flex;align-items:baseline;gap:10px;margin:20px 2px 12px}
 .tb-seg-t{font-size:15px;font-weight:700}
 .tb-seg-d{font-size:12px;color:var(--text-sub)}
 #tbScopeHint{margin-left:auto;font-size:11px;color:var(--text-sub);opacity:.75;font-weight:400}
