@@ -498,7 +498,9 @@ tbody tr.clickable { cursor: pointer; }
         <div class="stat-card clickable" title="点击查看全部任务列表" onclick="openStatCard('total')"><div class="icon" style="background:var(--primary-light);color:var(--primary)">📋</div><div><div class="num" id="statTotal" style="color:var(--primary)">0</div><div class="label" style="color:var(--primary);font-weight:600">任务总数</div></div><div class="chev">›</div></div>
         <div class="stat-card clickable" title="点击查看进行中任务列表" onclick="openStatCard('active')"><div class="icon" style="background:var(--success-bg);color:var(--success)">⚡</div><div><div class="num" id="statActive" style="color:var(--success)">0</div><div class="label" style="color:var(--success);font-weight:600">进行中</div></div><div class="chev">›</div></div>
         <div class="stat-card clickable" title="点击查看已完成任务列表" onclick="openStatCard('done')"><div class="icon" style="background:var(--warning-bg);color:var(--warning)">✔</div><div><div class="num" id="statDone" style="color:var(--warning)">0</div><div class="label" style="color:var(--warning);font-weight:600">已完成</div></div><div class="chev">›</div></div>
-        <div class="stat-card clickable" title="点击查看未关闭问题单列表" onclick="openStatCard('issues')"><div class="icon" style="background:var(--danger-bg);color:var(--danger)">🐞</div><div><div class="num" id="statIssues" style="color:var(--danger)">0</div><div class="label" style="color:var(--danger);font-weight:600">未关闭问题</div></div><div class="chev">›</div></div>
+        <div class="stat-card clickable" title="点击查看未关闭问题单列表" onclick="openStatCard('issues')"><div class="icon" style="background:var(--danger-bg);color:var(--danger)">🐞</div><div><div class="num" id="statIssues" style="color:var(--danger)">0</div><div class="label" style="color:var(--danger);font-weight:600">未关闭问题</div></div></div>
+      <div class="tb-seg"><span class="tb-seg-t">任务时序</span><span class="tb-seg-d">按结束日期动态判定 · 已完成/已关闭不参与 · 未排期需补数据</span><span id="tbScopeHint">—</span></div>
+      <div class="stats-grid">
         <div class="stat-card clickable" title="超出结束日期的在飞任务(done/closed不入盘)" onclick="tbOpen('late')"><div class="icon" style="background:var(--danger-bg);color:var(--danger)">⏰</div><div><div class="num" id="tbLate" style="color:var(--danger)">0</div><div class="label" style="color:var(--danger);font-weight:600">已超期</div></div><div class="chev">›</div></div>
         <div class="stat-card clickable" title="含今天在内3个自然日内到期的在飞任务(临期窗=今天+2,用户2026-09-23拍板)" onclick="tbOpen('soon')"><div class="icon" style="background:var(--warning-bg);color:var(--warning)">⏳</div><div><div class="num" id="tbSoon" style="color:var(--warning)">0</div><div class="label" style="color:var(--warning);font-weight:600">临期</div></div><div class="chev">›</div></div>
         <div class="stat-card clickable" title="在飞且未超期、不在临期窗口内(归类只看日历轴,进度落后另见列表偏慢参考标)" onclick="tbOpen('ontime')"><div class="icon" style="background:var(--success-bg);color:var(--success)">✔</div><div><div class="num" id="tbOn" style="color:var(--success)">0</div><div class="label" style="color:var(--success);font-weight:600">进度正常</div></div><div class="chev">›</div></div>
@@ -507,14 +509,16 @@ tbody tr.clickable { cursor: pointer; }
 <style id="tbStyles">
 /* 时序看板v2(2026-09-23用户:做得好丑): 撤自研tb-chip, 四卡收编进上方.stats-grid与首行同纲
    (.stat-card.clickable解剖同源——彩底icon+大数字+label+chev全继承), 本段只剩弹层内辅样式+栅下hint */
-#tbScopeHint{text-align:right;font-size:11px;color:var(--text-sub);opacity:.75;margin:-2px 2px 12px}
+.tb-seg{display:flex;align-items:baseline;gap:10px;margin:18px 2px -4px}
+.tb-seg-t{font-size:15px;font-weight:700}
+.tb-seg-d{font-size:12px;color:var(--text-sub)}
+#tbScopeHint{margin-left:auto;font-size:11px;color:var(--text-sub);opacity:.75;font-weight:400}
 .tb-who{display:inline-block;background:var(--primary-light);color:var(--primary);border-radius:4px;padding:1px 6px;font-size:11px;margin:1px}
 .tb-exp{color:var(--text-sub);font-size:11px}
 .tb-name{max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .tb-dates{white-space:nowrap;font-size:12px;color:var(--text-sub)}
 .tb-modcnt{padding:10px 16px;border-bottom:1px solid var(--border);font-size:12px;color:var(--text-sub)}
 </style>
-<div id="tbScopeHint">—</div>
 <div class="card">
         <div class="card-head"><h3>最近任务</h3><button class="btn btn-sm" onclick="switchView('tasks')">查看全部</button></div>
         <table>
