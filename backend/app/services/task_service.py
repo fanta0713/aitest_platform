@@ -794,7 +794,10 @@ class IssueService:
         open_count = 0
         for issue, task in rows:
             total += 1
-            if issue.status not in ("closed", "rejected"):
+            # 未关闭口径(2026-09-23用户反馈定夺): 只有待处理/已指派算未关,fixed(已解决)=绿灯
+            # 终态不再计——问题单模块是两态工作流(open↔fixed),"已解决"就该从"未关闭"退役。
+            # 与前端工作台statIssues口径一致(ISSUE_OPEN_STATUSES),改这里的务必同步改那边!
+            if issue.status in ("open", "assigned"):
                 open_count += 1
 
             node = IssueTreeNode(
