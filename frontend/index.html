@@ -5552,7 +5552,7 @@ function sfCheckAll(col, on){
 // 恢复块的 currentViewKey 守卫段落会用 issuesHashSuffix 把地址再次扶正——全程零新发明
 // ==================== 任务时序看板(2026-09-23改动14: 用户"分角色展示哪些任务临期/超期/正常") ====================
 // 口径唯一出处: 三态+未排期都在tbEval; 时间轴只有任务级begin~end(环节表begin/end是实际时间非计划,不判环节超期)
-// 视角: 登录currentUser.roles含pl/tse(或admin)即全局(auth.py:82官方源); 否则名下(owner/tse_id/version_owner/executor_id)
+// 视角: 登录currentUser.roles含pl/tse(或admin)即全局(auth.py:82官方源); 否则名下=当前环节负责人对号(current_step_assignee===self,v9收束)
 const TB_LEAD_DAYS = 2, TB_SLOW_GAP = 25; // 临期窗右沿=今天+2(含今天共3天); 偏慢=落后>=25pp(用户拍板)
 function tbToday() { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), d.getDate()); }
 function tbDaysLeft(t) {
@@ -5579,9 +5579,9 @@ function tbEval(t) { // 三态+未排期分类器:{bucket,days,exp,gap}; 完结�
   return { bucket: 'ontime', days: dl, exp: exp, gap: gap };
 }
 function tbEsc(x) { return String(x == null ? '' : x).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
-function tbMine(t) {
+function tbMine(t) { // v9(2026-09-23用户:非PL/TSE只看当前环节在自己名下的)——四人帮并集退役,环节负责人对号入座
   const u = currentUser; if (!u) return false;
-  return t.owner === u.id || t.tse_id === u.id || t.version_owner === u.id || t.executor_id === u.id;
+  return t.current_step_assignee === u.id;
 }
 function tbGlobalView() { // PL/TSE全局视角(用户原话); admin天然全局
   const rs = (currentUser && currentUser.roles) || [];
@@ -5603,7 +5603,7 @@ function tbRefresh() { // 全量重算四数+视角角标; 非工作台壳(tbLat
   document.getElementById('tbNs').textContent = c.nosched;
   document.getElementById('tbScopeHint').textContent = tbGlobalView()
     ? ('全局视野 ' + scoped.length + ' 项 · PL/TSE/admin 可见所有任务')
-    : ('名下视野 ' + scoped.length + ' 项 · 版本负责人/测试执行只看自己的任务');
+    : ('名下视野 ' + scoped.length + ' 项 · 只看当前环节在自己名下的任务');
 }
 const TB_META = {
   late:    ['已超期任务', 'var(--danger)', '超出结束日期的在飞任务'],
