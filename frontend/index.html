@@ -1296,10 +1296,15 @@ async function enterApp() {
   // ③ 灌数据。注意:此处必走 switchView/openTask 正规通道(viewLoader+hash+currentViewKey);
   //    顺带修掉老路径的重复加载——旧代码尾部还要经历一次 dashboard 壳带来的二轮loadStats/loadTasks
   if (detailHit) {
-    // 注意 openTask 自吞网络错(内部toast后return),外层catch接不到——以 currentTask 结果说话:
-    // 失效深链(任务被删/无权限)→ 已提示,壳回落工作台,与旧"restored"语义一致
-    try { await openTask(h.id); } finally {}
-    if (!(currentTask && currentTask.id === h.id)) switchView('dashboard');
+    if (h.view === 'suiteDetail') {
+      // 套件详情深链:loadSuiteDetail 自带存在性门(查无此套件→toast+回套件列表)
+      await openSuiteDetail(h.sid);
+    } else {
+      // 注意 openTask 自吞网络错(内部toast后return),外层catch接不到——以 currentTask 结果说话:
+      // 失效深链(任务被删/无权限)→ 已提示,壳回落工作台,与旧"restored"语义一致
+      try { await openTask(h.id); } finally {}
+      if (!(currentTask && currentTask.id === h.id)) switchView('dashboard');
+    }
   } else if (h && h.view === 'caselib' && h.lib) {
     // 用例库二级深链:取全库缓存(名字栏有着落)→进库;库已删→留列表态+一句提示,不硬错
     await loadCaseLibs();
@@ -1308,9 +1313,6 @@ async function enterApp() {
     } else {
       toast(`深链的用例库(ID:${h.lib})不存在或已删除，已回到用例库列表`, true);
     }
-  } else if (h && h.view === 'suiteDetail' && h.sid) {
-    // 套件详情深链:loadSuiteDetail 自带存在性门(查无此套件→toast+回套件列表)
-    await openSuiteDetail(h.sid);
   } else {
     switchView((h && NAV_VIEWS.indexOf(h.view) >= 0) ? h.view : 'dashboard', h && h.sub);
   }
