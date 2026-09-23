@@ -1391,6 +1391,15 @@ function parseViewHash() {
     }
     return { view: 'issues' };    // 纯 #/issues = 产品列表层(旧行为)
   }
+  if (v === 'tasks') {
+    // 全数字段逐级收紧:产品→项目;任一层不合法即在该层截断(容错=浅层有效,与issues同口径)
+    if (s && /^\d+$/.test(s)) {
+      const r = { view: 'tasks', tprod: s };
+      if (t && /^\d+$/.test(t)) r.tproj = t;
+      return r;
+    }
+    return { view: 'tasks' };   // 纯 #/tasks = 产品列表层(旧行为)
+  }
   if (NAV_VIEWS.indexOf(v) >= 0) {
     return (v === 'mytasks' && s === 'done') ? { view: 'mytasks', sub: 'done' } : { view: v };
   }
@@ -1439,6 +1448,7 @@ function switchView(name, sub) {
   currentViewKey = name;
   if (name === 'taskDetail' && currentTask) setViewHash('taskDetail', String(currentTask.id));
   else if (name === 'mytasks') setViewHash('mytasks', (sub === 'done') ? 'done' : null);
+  else if (name === 'tasks') setViewHash('tasks', tasksHashSuffix());  // 保层:详情返回列表/他处切回时不吹掉下钻子段(内存层级还在,恢复块之外的对偶记账)
   else if (NAV_VIEWS.indexOf(name) >= 0) setViewHash(name);
 }
 
@@ -1708,6 +1718,9 @@ async function loadStats() {
 
 let allTasksCache = [];
 async function loadTasks() {
+  // 快照hash必须在同步段(switchView尾部截段竞态,issues热修d16e178同一课):
+  // switchView尾行会同步把#/tasks/P/Q截成#/tasks,恢复块等await回来读的就是残段
+  const hr0 = parseViewHash();
   // 先确保产品/项目缓存已加载（三级导航需要）
   if (!zentaoProductsCache.length) { try { zentaoProductsCache = await api('/api/products'); } catch(e) {} }
   if (!zentaoProjectsCache.length) { try { zentaoProjectsCache = await api('/api/projects'); } catch(e) {} }
@@ -1716,6 +1729,26 @@ async function loadTasks() {
     allTasksCache = data.items;
   } catch (e) { return; }
   renderRecent(allTasksCache.slice(0, 6));
+  // 深链恢复(唯一恢复点,enterApp刷新与hashchange共用):按入口快照逐层校验、逐层深入,
+  // 断在哪层就停在哪层并用 tasksHashSuffix 把地址对齐到实际达成的层级(部分失链不漂移)。
+  // 存储用Number(渲染过滤p.product_id===taskNavProductId系严格等,字符串会失配——issues树用String比较与此不同,勿混)
+  if (hr0 && hr0.view === 'tasks' && hr0.tprod) {
+    const P = Number(hr0.tprod);
+    if ((zentaoProductsCache || []).some(p => p.id === P)) {
+      taskNavProductId = P; taskNavLevel = 'projects';
+      if (hr0.tproj) {
+        const Q = Number(hr0.tproj);
+        if ((zentaoProjectsCache || []).some(pr => pr.id === Q && pr.product_id === P)) {
+          taskNavProjectId = Q; taskNavLevel = 'tasks';
+        }
+      }
+      if (currentViewKey === 'tasks') setViewHash('tasks', tasksHashSuffix());
+    } else {
+      // 产品都找不着(禅道侧下架/被删):留在产品列表,提示但不硬错
+      if (currentViewKey === 'tasks') setViewHash('tasks');
+      toast(`深链的测试任务产品(ID:${hr0.tprod})不存在或已变化，已回到产品列表`, true);
+    }
+  }
   renderTaskNav();
 }
 
@@ -1742,6 +1775,13 @@ function userName(id) {
 let taskNavLevel = 'products';  // 'products' | 'projects' | 'tasks'
 let taskNavProductId = null;
 let taskNavProjectId = null;
+
+// 测试任务hash后缀与内存状态的唯一翻译官:任何层级 → '' | 'P' | 'P/Q'(第三层是任务表,点行走taskDetail另有记账)
+function tasksHashSuffix() {
+  if (taskNavLevel === 'products' || !taskNavProductId) return '';
+  if (taskNavLevel === 'projects' || !taskNavProjectId) return String(taskNavProductId);
+  return taskNavProductId + '/' + taskNavProjectId;
+}
 
 function onTaskSearch() {
   const kw = (document.getElementById('taskSearchInput').value || '').trim();
@@ -1870,6 +1910,7 @@ function renderTaskNavProducts() {
 function enterTaskProduct(pid) {
   taskNavProductId = pid;
   taskNavLevel = 'projects';
+  if (currentViewKey === 'tasks') setViewHash('tasks', tasksHashSuffix());
   renderTaskNav();
 }
 
@@ -1897,6 +1938,7 @@ function renderTaskNavProjects() {
 function enterTaskProject(pid) {
   taskNavProjectId = pid;
   taskNavLevel = 'tasks';
+  if (currentViewKey === 'tasks') setViewHash('tasks', tasksHashSuffix());
   renderTaskNav();
 }
 
@@ -1904,12 +1946,14 @@ function backToTaskProducts() {
   taskNavLevel = 'products';
   taskNavProductId = null;
   taskNavProjectId = null;
+  if (currentViewKey === 'tasks') setViewHash('tasks', tasksHashSuffix());
   renderTaskNav();
 }
 
 function backToTaskProjects() {
   taskNavLevel = 'projects';
   taskNavProjectId = null;
+  if (currentViewKey === 'tasks') setViewHash('tasks', tasksHashSuffix());
   renderTaskNav();
 }
 
