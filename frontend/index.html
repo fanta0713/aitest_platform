@@ -1467,7 +1467,7 @@ function switchView(name, sub) {
   document.querySelectorAll('.nav-item').forEach(n => n.classList.toggle('active', n.dataset.view === name));
   const el = document.getElementById('view-' + name);
   if (el) el.classList.add('active');
-  if (name === 'dashboard') { loadStats(); loadTasks(); }
+  if (name === 'dashboard') { loadStats(); loadTasks(); ensureIssueTree(); }  // 树随场暖:未关闭问题卡随时点得动
   if (name === 'tasks') loadTasks();
   if (name === 'mytasks') loadMyTasks(sub === 'done' ? 'done' : 'pending');
   if (name === 'people') renderUserRoles();
@@ -5012,6 +5012,16 @@ async function loadIssueTree() {
   }
 }
 
+// 单例加载器: 同一时刻至多一颗在飞的树请求;弹层/工作台暖场共用同一promise——
+// 谁先谁种树,后来者候 procurement,绝不双发(2026-09-23刷新后点弹层报null+短暂点不动的根治)
+let _issueTreeP = null;
+function ensureIssueTree() {
+  if (!_issueTreeP) {
+    _issueTreeP = (async () => { await loadIssueTree(); return issueTreeCache; })();
+  }
+  return _issueTreeP;
+}
+
 function countIssuesUnderProduct(p) {
   return (p.projects || []).reduce((s, pr) => s + (pr.tasks || []).reduce((t, tk) => t + tk.issues.length, 0), 0);
 }
@@ -5288,6 +5298,14 @@ function openStatCard(kind) {
 
   window._statLastKind = kind;  // 弹层开着改状态,即时重算重显(updateIssueStatus尾部挂钩)
   if (kind === 'issues') {
+    // 树没到货时的自愈路径: 现场亮"装载中",挂到同一颗在飞请求上,到了自动重开——零死区
+    // (此前issueTreeCache初始null,未经问题单栏目直接点红卡必炸TypeError,表现为"点不动")
+    if (!issueTreeCache) {
+      body.innerHTML = '<div class="empty" style="padding:26px">问题单数据装载中<span class="dots">…</span></div>';
+      document.getElementById('statModal').classList.add('show');
+      ensureIssueTree().then(() => { if (window._statLastKind === 'issues') openStatCard('issues'); });
+      return;
+    }
     // 走 issuesTree 缓存按四段层级一路收集(树本身就是权威序)
     const rows = [];
     for (const p of (issueTreeCache.products || []))
