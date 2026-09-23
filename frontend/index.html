@@ -2087,6 +2087,10 @@ function renderRecent(tasks) {
 
 // ============ 任务详情 ============
 async function openTask(id) {
+  // v8(2026-09-23用户:点进任务后当前框要关掉): 弹层唤起的详情须闭所——statFilter面板+statModal统一入口闭拜,
+  // closeModal幂等无show亦无妨, 其余调用点零感知
+  closeStatFilter();
+  closeModal('statModal');
   try {
     currentTask = await api(`/api/tasks/${id}`);
   } catch (e) { toast(e.message, true); return; }
