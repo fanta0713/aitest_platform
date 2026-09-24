@@ -5598,9 +5598,10 @@ function tbGlobalView() { // PL/TSE全局视角(用户原话); admin天然全局
   return rs.indexOf('pl') >= 0 || rs.indexOf('tse') >= 0 ||
     (currentUser && (currentUser.is_admin || rs.indexOf('admin') >= 0));
 }
-function tbScope() {
+function tbScope() { // v14(2026-09-24用户:PL/TSE在工作台展示的也应当是个人看板,任务总览放所有任务看板)
+  // 时序栅=个人看板(无条件名下口径,v9的dynamic在Hold住对号); 全局aggregate交给上方「任务总览」专职
   const src = Array.isArray(allTasksCache) ? allTasksCache : [];
-  return tbGlobalView() ? src : src.filter(tbMine);
+  return src.filter(tbMine);
 }
 function tbRefresh() { // 全量重算四数+视角角标; 非工作台壳(tbLate不存在)静默跳过
   const elLate = document.getElementById('tbLate'); if (!elLate) return;
@@ -5611,9 +5612,7 @@ function tbRefresh() { // 全量重算四数+视角角标; 非工作台壳(tbLat
   document.getElementById('tbSoon').textContent = c.soon;
   document.getElementById('tbOn').textContent = c.ontime;
   document.getElementById('tbNs').textContent = c.nosched;
-  document.getElementById('tbScopeHint').textContent = tbGlobalView()
-    ? ('全局视野 ' + scoped.length + ' 项')
-    : ('名下视野 ' + scoped.length + ' 项');
+  document.getElementById('tbScopeHint').textContent = '名下视野 ' + scoped.length + ' 项';
 }
 const TB_META = {
   late:    ['已超期任务', 'var(--danger)', '超出结束日期的在飞任务'],
