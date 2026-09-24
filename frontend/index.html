@@ -5642,6 +5642,9 @@ function tbRow(e) { // v7(2026-09-23用户:简洁收权)→v16增finished/issues
   if (e.bucket === 'finished') dlTxt = '<span class="badge badge-green">已完成</span>';
   else if (e.bucket === 'issues') dlTxt = '<span class="badge badge-red">' + (e.icnt || 0) + ' 个未关闭</span>';
   else if (e.days == null) dlTxt = '<span class="badge badge-gray">未排期</span>';
+  else if (e.days < 0) dlTxt = '<span class="badge badge-red">超期 ' + (-e.days) + ' 天</span>';
+  else if (e.days === 0) dlTxt = '<span class="badge badge-amber">今天到期</span>';
+  else dlTxt = '<span class="badge badge-green">剩 ' + e.days + ' 天</span>'; // v16.1散配回补:上午窗改三段式时此三腿被夹没,late/soon/ontime全档踩空报undefined(2026-09-24用户截图赐教)
   // 环节负责人=current环节assigned_to(后端TaskResponse.current_step_assignee官方直出,schemas.py:70)
   const assignee = (t.current_step_assignee_name) || (t.current_step_assignee ? userName(t.current_step_assignee) : '—');
   // 唯一入口=编号蓝链(用户:其他地方不支持点击);行级onclick/cursor/title三件随v7撤编

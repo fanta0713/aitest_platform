@@ -71,6 +71,15 @@ chk('dict-tbIssCnt-reset', s.count('tbIssCnt = {};') == 2)  # 声明行+loadStat
 chk('dict-tbIssCnt-read', s.count('tbIssCnt[t.id]') >= 1)
 chk('row-fin-badge', s.count("if (e.bucket === 'finished') dlTxt") == 1)
 chk('row-iss-badge', s.count("else if (e.bucket === 'issues') dlTxt") == 1)
+# ---- v16.1 tbRow日期三腿归位哨(2026-09-24用户截图赐教undefined 0%案)----
+# 病史: 三段式改造时四legs三目整链被new_string吞吃、仅吐三臂,date三腿阵亡→late/soon/ontime踩空报undefined
+# 六臂成员籍全点卯(穷尽性=finished+issues+未排期+超期+今天+剩余,else兜底)
+chk('arm-days-null', s.count("else if (e.days == null) dlTxt") == 1)
+chk('leg-overdue', s.count('else if (e.days < 0) dlTxt') == 1)
+chk('leg-today', s.count('else if (e.days === 0) dlTxt') == 1)
+chk('leg-remain-else', s.count('else dlTxt =') == 1)
+chk('leg-phrase-set', all(p in s for p in (
+    "超期 ' + (-e.days) + ' 天", "今天到期", "剩 ' + e.days + ' 天")))
 chk('counter-double-ledger', 'const g = { late: 0, soon: 0, ontime: 0, finished: 0 };' in s
     and 'const c = { late: 0, soon: 0, ontime: 0, finished: 0 };' in s)
 chk('chained-loadstats-cure', 'loadStats();' in s)  # tbRefresh尾钩(冷启动自愈)
