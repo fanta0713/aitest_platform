@@ -177,8 +177,8 @@ input, select, textarea { font-family: inherit; font-size: 14px; outline: none; 
 .btn-danger-text { color: var(--danger); border: none; background: none; padding: 4px 8px; border-radius: 6px; font-size: 12px; }
 .btn-danger-text:hover { background: var(--danger-bg); }
 
-/* 统计卡片 */
-.stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
+/* 统计卡片(v16起两栅皆五卡: 已超期/临期/进度正常/已完成/未关闭问题,2026-09-24用户拍板对称) */
+.stats-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 16px; margin-bottom: 24px; }
 .stat-card {
   background: var(--card-bg); border-radius: var(--radius); padding: 20px;
   box-shadow: var(--shadow); display: flex; align-items: center; gap: 16px;
@@ -496,18 +496,19 @@ tbody tr.clickable { cursor: pointer; }
       </div>
             <div class="tb-seg"><span class="tb-seg-t">任务总览</span></div>
 <div class="stats-grid">
-        <div class="stat-card clickable" title="点击查看全部任务列表" onclick="openStatCard('total')"><div class="icon" style="background:var(--primary-light);color:var(--primary)">📋</div><div><div class="num" id="statTotal" style="color:var(--primary)">0</div><div class="label" style="color:var(--primary);font-weight:600">任务总数</div></div><div class="chev">›</div></div>
-        <div class="stat-card clickable" title="点击查看进行中任务列表" onclick="openStatCard('active')"><div class="icon" style="background:var(--success-bg);color:var(--success)">⚡</div><div><div class="num" id="statActive" style="color:var(--success)">0</div><div class="label" style="color:var(--success);font-weight:600">进行中</div></div><div class="chev">›</div></div>
-        <div class="stat-card clickable" title="点击查看已完成任务列表" onclick="openStatCard('done')"><div class="icon" style="background:var(--warning-bg);color:var(--warning)">✔</div><div><div class="num" id="statDone" style="color:var(--warning)">0</div><div class="label" style="color:var(--warning);font-weight:600">已完成</div></div><div class="chev">›</div></div>
-        <div class="stat-card clickable" title="点击查看未关闭问题单列表" onclick="openStatCard('issues')"><div class="icon" style="background:var(--danger-bg);color:var(--danger)">🐞</div><div><div class="num" id="statIssues" style="color:var(--danger)">0</div><div class="label" style="color:var(--danger);font-weight:600">未关闭问题</div></div><div class="chev">›</div></div>
+        <div class="stat-card clickable" title="全体任务中,超出结束日期的在飞任务(done/closed不入盘)" onclick="tbOpen('late','all')"><div class="icon" style="background:var(--danger-bg);color:var(--danger)">⏰</div><div><div class="num" id="gvLate" style="color:var(--danger)">0</div><div class="label" style="color:var(--danger);font-weight:600">已超期</div></div><div class="chev">›</div></div>
+        <div class="stat-card clickable" title="全体任务中,含今天在内3个自然日内到期的在飞任务" onclick="tbOpen('soon','all')"><div class="icon" style="background:var(--warning-bg);color:var(--warning)">⏳</div><div><div class="num" id="gvSoon" style="color:var(--warning)">0</div><div class="label" style="color:var(--warning);font-weight:600">临期</div></div><div class="chev">›</div></div>
+        <div class="stat-card clickable" title="全体任务中,在飞且未超期、不在临期窗口内的" onclick="tbOpen('ontime','all')"><div class="icon" style="background:var(--success-bg);color:var(--success)">▶</div><div><div class="num" id="gvOn" style="color:var(--success)">0</div><div class="label" style="color:var(--success);font-weight:600">进度正常</div></div><div class="chev">›</div></div>
+        <div class="stat-card clickable" title="全体任务中,状态为测试完成或已关闭的" onclick="tbOpen('finished','all')"><div class="icon" style="background:var(--warning-bg);color:var(--warning)">✔</div><div><div class="num" id="gvFin" style="color:var(--warning)">0</div><div class="label" style="color:var(--warning);font-weight:600">已完成</div></div><div class="chev">›</div></div>
+        <div class="stat-card clickable" title="全体任务上的待处理/已指派问题单(未关闭口径)" onclick="openStatCard('issues')"><div class="icon" style="background:var(--danger-bg);color:var(--danger)">🐞</div><div><div class="num" id="gvIss" style="color:var(--danger)">0</div><div class="label" style="color:var(--danger);font-weight:600">未关闭问题</div></div><div class="chev">›</div></div>
       </div>
-      <div class="tb-ovstrip" id="tbOvStrip">—</div>
       <div class="tb-seg"><span class="tb-seg-t">我的任务看板</span><span id="tbScopeHint">—</span></div>
       <div class="stats-grid">
-        <div class="stat-card clickable" title="超出结束日期的在飞任务(done/closed不入盘)" onclick="tbOpen('late')"><div class="icon" style="background:var(--danger-bg);color:var(--danger)">⏰</div><div><div class="num" id="tbLate" style="color:var(--danger)">0</div><div class="label" style="color:var(--danger);font-weight:600">已超期</div></div><div class="chev">›</div></div>
-        <div class="stat-card clickable" title="含今天在内3个自然日内到期的在飞任务(临期窗=今天+2,用户2026-09-23拍板)" onclick="tbOpen('soon')"><div class="icon" style="background:var(--warning-bg);color:var(--warning)">⏳</div><div><div class="num" id="tbSoon" style="color:var(--warning)">0</div><div class="label" style="color:var(--warning);font-weight:600">临期</div></div><div class="chev">›</div></div>
-        <div class="stat-card clickable" title="在飞且未超期、不在临期窗口内(归类只看日历轴,进度落后另见列表偏慢参考标)" onclick="tbOpen('ontime')"><div class="icon" style="background:var(--success-bg);color:var(--success)">✔</div><div><div class="num" id="tbOn" style="color:var(--success)">0</div><div class="label" style="color:var(--success);font-weight:600">进度正常</div></div><div class="chev">›</div></div>
-        <div class="stat-card clickable" title="未填写结束日期的任务,不计入三态,灰色常显提醒补数据" onclick="tbOpen('nosched')"><div class="icon" style="background:#f1f5f9;color:var(--text-sub)">○</div><div><div class="num" id="tbNs" style="color:var(--text-sub)">0</div><div class="label" style="color:var(--text-sub);font-weight:600">未排期</div></div><div class="chev">›</div></div>
+        <div class="stat-card clickable" title="我名下(当前环节负责人是我),超出结束日期的在飞任务(done/closed不入盘)" onclick="tbOpen('late')"><div class="icon" style="background:var(--danger-bg);color:var(--danger)">⏰</div><div><div class="num" id="tbLate" style="color:var(--danger)">0</div><div class="label" style="color:var(--danger);font-weight:600">已超期</div></div><div class="chev">›</div></div>
+        <div class="stat-card clickable" title="我名下,含今天在内3个自然日内到期的在飞任务" onclick="tbOpen('soon')"><div class="icon" style="background:var(--warning-bg);color:var(--warning)">⏳</div><div><div class="num" id="tbSoon" style="color:var(--warning)">0</div><div class="label" style="color:var(--warning);font-weight:600">临期</div></div><div class="chev">›</div></div>
+        <div class="stat-card clickable" title="我名下,在飞且未超期、不在临期窗口内的" onclick="tbOpen('ontime')"><div class="icon" style="background:var(--success-bg);color:var(--success)">▶</div><div><div class="num" id="tbOn" style="color:var(--success)">0</div><div class="label" style="color:var(--success);font-weight:600">进度正常</div></div><div class="chev">›</div></div>
+        <div class="stat-card clickable" title="我名下,状态为测试完成或已关闭的" onclick="tbOpen('finished')"><div class="icon" style="background:var(--warning-bg);color:var(--warning)">✔</div><div><div class="num" id="tbFin" style="color:var(--warning)">0</div><div class="label" style="color:var(--warning);font-weight:600">已完成</div></div><div class="chev">›</div></div>
+        <div class="stat-card clickable" title="我名下任务上的待处理/已指派问题单(未关闭口径)" onclick="tbOpen('issues')"><div class="icon" style="background:var(--danger-bg);color:var(--danger)">🐞</div><div><div class="num" id="tbIss" style="color:var(--danger)">0</div><div class="label" style="color:var(--danger);font-weight:600">未关闭问题</div></div><div class="chev">›</div></div>
       </div>
 <style id="tbStyles">
 /* 时序看板v2(2026-09-23用户:做得好丑): 撤自研tb-chip, 四卡收编进上方.stats-grid与首行同纲
@@ -515,9 +516,6 @@ tbody tr.clickable { cursor: pointer; }
 .tb-seg{display:flex;align-items:baseline;gap:10px;margin:20px 2px 12px}
 .tb-seg-t{font-size:15px;font-weight:700}
 #tbScopeHint{margin-left:auto;font-size:11px;color:var(--text-sub);opacity:.75;font-weight:400}
-/* v15(2026-09-24用户拍板B摘要行): 任务总览时效速览条,插于两段之间,纯文字不可点(下钻仍走四卡/四弹层) */
-.tb-ovstrip{margin:-6px 2px 0;font-size:12px;color:var(--text-sub);letter-spacing:.2px}
-.tb-ovstrip b{font-weight:700}
 .tb-who{display:inline-block;background:var(--primary-light);color:var(--primary);border-radius:4px;padding:1px 6px;font-size:11px;margin:1px}
 .tb-exp{color:var(--text-sub);font-size:11px}
 .tb-name{max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -1778,26 +1776,27 @@ async function createProject() {
 
 
 async function loadStats() {
-  try {
-    const s = await api('/api/tasks/stats');
-    document.getElementById('statTotal').textContent = s.total;
-    document.getElementById('statActive').textContent = s.active;
-    document.getElementById('statDone').textContent = s.done;
-  } catch (e) {}
   // 统计未关闭问题(口径:只有待处理/已指派算未关——2026-09-23用户反馈,"已解决"不该再挂未关;
   // 与后端issues/tree的open_count同口径,改这里务必同步task_service.get_issue_tree!)
+  // v16:原 total/active/done 三数卡退役,stats 接口调用随之裁撤,本函专职问题聚合(双计数:全体gvIss+名下tbIss)
   const ISSUE_OPEN_STATUSES = ['open', 'assigned'];
-  let openIssues = 0;
-  for (const t of allTasksCache) {
+  tbIssCnt = {};
+  let gvIssues = 0, mbIssues = 0;
+  for (const t of (Array.isArray(allTasksCache) ? allTasksCache : [])) {
     try {
       const issues = await api(`/api/tasks/${t.id}/issues`);
-      openIssues += issues.filter(i => ISSUE_OPEN_STATUSES.includes(i.status)).length;
+      const n = issues.filter(i => ISSUE_OPEN_STATUSES.includes(i.status)).length;
+      tbIssCnt[t.id] = n;
+      gvIssues += n;
+      if (tbMine(t)) mbIssues += n;
     } catch (e) {}
   }
-  document.getElementById('statIssues').textContent = openIssues;
+  const gv = document.getElementById('gvIss'); if (gv) gv.textContent = gvIssues;
+  const mb = document.getElementById('tbIss'); if (mb) mb.textContent = mbIssues;
 }
 
 let allTasksCache = [];
+let tbIssCnt = {}; // 任务id→未关闭问题数:问题速览弹层(下栅🞐卡)的行语料之源(TDZ无忧:首调必在全量script评估后)
 async function loadTasks() {
   // 快照hash必须在同步段(switchView尾部截段竞态,issues热修d16e178同一课):
   // switchView尾行会同步把#/tasks/P/Q截成#/tasks,恢复块等await回来读的就是残段
@@ -5597,50 +5596,52 @@ function tbMine(t) { // v9(2026-09-23用户:非PL/TSE只看当前环节在自己
   const u = currentUser; if (!u) return false;
   return t.current_step_assignee === u.id;
 }
-function tbGlobalView() { // PL/TSE全局视角(用户原话); admin天然全局
-  const rs = (currentUser && currentUser.roles) || [];
-  return rs.indexOf('pl') >= 0 || rs.indexOf('tse') >= 0 ||
-    (currentUser && (currentUser.is_admin || rs.indexOf('admin') >= 0));
-}
+// (v16)tbGlobalView退役:上栅全体/下栅名下的对称直给出,无需角色分支(v14挂账就此销账)
 function tbScope() { // v14(2026-09-24用户:PL/TSE在工作台展示的也应当是个人看板,任务总览放所有任务看板)
   // 时序栅=个人看板(无条件名下口径,v9的dynamic在Hold住对号); 全局aggregate交给上方「任务总览」专职
   const src = Array.isArray(allTasksCache) ? allTasksCache : [];
   return src.filter(tbMine);
 }
-function tbRefresh() { // 全量重算四数+视角角标; 非工作台壳(tbLate不存在)静默跳过
+function tbRefresh() { // v16对称五卡重算(2026-09-24用户:两栅同样五块,上栅全体/下栅名下); 非工作台壳静默跳过
   const elLate = document.getElementById('tbLate'); if (!elLate) return;
   if (!Array.isArray(allTasksCache)) return;
-  const scoped = tbScope(), c = { late: 0, soon: 0, ontime: 0, nosched: 0 };
-  scoped.forEach(function (t) { const b = tbEval(t).bucket; if (c[b] != null) c[b]++; });
+  // 双账本一循环:g=全体账, c=名下账; 桶序=卡序(late/soon/ontime/finished)
+  const c = { late: 0, soon: 0, ontime: 0, finished: 0 };
+  const g = { late: 0, soon: 0, ontime: 0, finished: 0 };
+  allTasksCache.forEach(function (t) {
+    const b = tbEval(t).bucket;
+    if (g[b] != null) g[b]++;
+    if (c[b] != null && tbMine(t)) c[b]++;
+  });
+  // 上栅(全体)
+  document.getElementById('gvLate').textContent = g.late;
+  document.getElementById('gvSoon').textContent = g.soon;
+  document.getElementById('gvOn').textContent = g.ontime;
+  document.getElementById('gvFin').textContent = g.finished;
+  // 下栅(名下)
   elLate.textContent = c.late;
   document.getElementById('tbSoon').textContent = c.soon;
   document.getElementById('tbOn').textContent = c.ontime;
-  document.getElementById('tbNs').textContent = c.nosched;
-  document.getElementById('tbScopeHint').textContent = '名下视野 ' + scoped.length + ' 项';
-  // v15(2026-09-24用户:任务总览也应体现超期/临期/正常等状态,拍板B不可点摘要行): 全集分箱一行速览;
-  // 终态两端(已完成/未关闭问题)已由上栅专卡正名,此处只补时效四态,不与专卡抢戏
-  const gg = { late: 0, soon: 0, ontime: 0, nosched: 0, finished: 0 };
-  allTasksCache.forEach(function (t) { gg[tbEval(t).bucket]++; });
-  const ov = document.getElementById('tbOvStrip');
-  if (ov) ov.innerHTML = '<span>全体 ' + allTasksCache.length + ' 个任务的时效:</span>'
-    + ' <span style="color:var(--danger)">已超期 <b>' + gg.late + '</b></span> ·'
-    + ' <span style="color:var(--warning)">临期 <b>' + gg.soon + '</b></span> ·'
-    + ' <span style="color:var(--success)">进度正常 <b>' + gg.ontime + '</b></span> ·'
-    + ' <span>未排期 <b>' + gg.nosched + '</b></span>';
+  document.getElementById('tbFin').textContent = c.finished;
+  document.getElementById('tbScopeHint').textContent = '名下视野 ' + allTasksCache.filter(tbMine).length + ' 项';
+  // issues 两卡数字由 loadStats 专属供给(需逐任务拉问题,任务落袋即触发补算,冷启动清零暗疾就此根治)
+  loadStats();
 }
 const TB_META = {
-  late:    ['已超期任务', 'var(--danger)', '超出结束日期的在飞任务'],
-  soon:    ['临期任务(3日内到期)', 'var(--warning)', '含今天在内,3个自然日内到期的在飞任务'],
-  ontime:  ['进度正常任务', 'var(--success)', '在飞且未超期、不在临期窗口内'],
-  nosched: ['未排期任务', 'var(--text-sub)', '未填写结束日期,不计入三态']
+  late:     ['已超期任务', 'var(--danger)', '超出结束日期的在飞任务'],
+  soon:     ['临期任务(3日内到期)', 'var(--warning)', '含今天在内,3个自然日内到期的在飞任务'],
+  ontime:   ['进度正常任务', 'var(--success)', '在飞且未超期、不在临期窗口内'],
+  finished: ['已完成任务', 'var(--warning)', '状态为测试完成或已关闭的任务'],
+  issues:   ['未关闭问题(名下任务)', 'var(--danger)', '我名下任务上的待处理/已指派问题单'],
+  nosched:  ['未排期任务', 'var(--text-sub)', '未填写结束日期,不计入三态']
 };
 function tbFmtD(v) { return v ? String(v) : '&mdash;'; }
-function tbRow(e) { // v7(2026-09-23用户:红框的偏慢标不用展示+编号置蓝可点+其他地方不点头进详情)——简洁收权款
+function tbRow(e) { // v7(2026-09-23用户:简洁收权)→v16增finished/issues两徽:右列按bucket分流
   const t = e.t;
-  const dlTxt = e.days == null ? '<span class="badge badge-gray">未排期</span>'
-    : e.days < 0 ? '<span class="badge badge-red">超期 ' + (-e.days) + ' 天</span>'
-    : e.days === 0 ? '<span class="badge badge-amber">今天到期</span>'
-    : '<span class="badge badge-green">剩 ' + e.days + ' 天</span>';
+  let dlTxt;
+  if (e.bucket === 'finished') dlTxt = '<span class="badge badge-green">已完成</span>';
+  else if (e.bucket === 'issues') dlTxt = '<span class="badge badge-red">' + (e.icnt || 0) + ' 个未关闭</span>';
+  else if (e.days == null) dlTxt = '<span class="badge badge-gray">未排期</span>';
   // 环节负责人=current环节assigned_to(后端TaskResponse.current_step_assignee官方直出,schemas.py:70)
   const assignee = (t.current_step_assignee_name) || (t.current_step_assignee ? userName(t.current_step_assignee) : '—');
   // 唯一入口=编号蓝链(用户:其他地方不支持点击);行级onclick/cursor/title三件随v7撤编
@@ -5653,22 +5654,27 @@ function tbRow(e) { // v7(2026-09-23用户:红框的偏慢标不用展示+编号
     + '<td class="tb-nw">' + tbEsc(assignee) + '</td>'
     + '<td class="tb-nw">' + dlTxt + ' ' + (t.progress || 0) + '%</td></tr>';
 }
-function tbOpen(kind) { // 列表弹层,复用statModal基建(关闭 hygiene 与 Excel筛选家族同款)
+function tbOpen(kind, scope) { // 列表弹层,复用statModal基建; v16(2026-09-24用户:两栅对称五卡)——scope='all'=上栅全体口径,缺省名下(v14二分)
   closeStatFilter();
   const meta = TB_META[kind];
+  const wide = scope === 'all';
   document.getElementById('statModalTitle').innerHTML =
     '<span style="color:' + meta[1] + '">●</span> ' + meta[0] +
-    ' <span class="tb-exp">' + meta[2] + '</span>';
+    ' <span class="tb-exp">' + (wide ? '全体任务 · ' : '我名下 · ') + meta[2] + '</span>';
   const body = document.getElementById('statModalBody');
   if (!Array.isArray(allTasksCache)) {
     body.innerHTML = '<div class="empty" style="padding:26px">任务数据尚未装载,请稍后再试或刷新页面</div>';
     document.getElementById('statModal').classList.add('show');
     return;
   }
-  const scoped = tbScope();
+  const pool = wide ? allTasksCache : tbScope();
   let rows = [];
-  scoped.forEach(function (t) { const e = tbEval(t); if (e.bucket === kind) { e.t = t; rows.push(e); } });
-  rows.sort(function (a, b) { // 超期:超得多靠前; 临期/正常:剩得少靠前; 未排期保持原序
+  if (kind === 'issues') { // 问题速览:数字血统=loadStats逐任务聚合(未关闭口径同一门规)
+    pool.forEach(function (t) { const n = tbIssCnt[t.id] || 0; if (n > 0) rows.push({ t: t, days: null, bucket: 'issues', icnt: n }); });
+  } else {
+    pool.forEach(function (t) { const e = tbEval(t); if (e.bucket === kind) { e.t = t; rows.push(e); } });
+  }
+  rows.sort(function (a, b) { // 超期:超得多靠前; 临期/正常:剩得少靠前; 其余(days为null)保原序
     if (a.days == null && b.days == null) return 0;
     if (a.days == null) return 1;
     if (b.days == null) return -1;
@@ -5678,8 +5684,7 @@ function tbOpen(kind) { // 列表弹层,复用statModal基建(关闭 hygiene 与
     ? '<table><thead><tr><th>编号</th><th>任务名称</th><th>产品</th><th>项目</th><th>当前环节</th><th>环节负责人</th><th>临期/超期 · 进度</th></tr></thead><tbody>'
       + rows.map(tbRow).join('') + '</tbody></table>'
     : '<div class="empty" style="padding:26px">当前没有' + meta[0] + '</div>';
-  body.innerHTML = '<div class="tb-modcnt">匹配 ' + rows.length + ' / 视野 ' + scoped.length + ' 项('
-    + (tbGlobalView() ? '全局' : '名下') + ')</div>' + inner;
+  body.innerHTML = '<div class="tb-modcnt">匹配 ' + rows.length + ' / ' + (wide ? '全体' : '名下') + '视野 ' + pool.length + ' 项</div>' + inner;
   document.getElementById('statModal').classList.add('show');
 }
 
