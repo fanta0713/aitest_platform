@@ -1574,7 +1574,7 @@ async function loadMyTasks(mode = 'pending') {
         <td>${esc(t.version || '—')}</td>
         <td class="muted" style="font-size:12px">${formatTaskDateRange(t)}</td>
         <td>${t.progress}%</td>
-        <td><span class="badge ${isMyTurn ? 'badge-blue' : 'badge-gray'}">${t.current_step}. ${t.current_step_name || STEP_NAMES[t.current_step-1] || '—'}</span></td>
+        <td><span class="badge ${isMyTurn ? 'badge-blue' : 'badge-gray'}">${stepLabel(t)}</span></td>
         <td>${myRoles.map(r => `<span class="badge badge-gray">${r}</span>`).join(' ') || '—'}</td>
         <td>${isMyTurn ? '<span style="color:var(--primary);font-weight:600">我</span>' : esc(handlerName)}</td>
       </tr>`;
@@ -1839,6 +1839,13 @@ const STATUS_MAP = {
 };
 const STEP_NAMES = ['任务发起','测试设计','版本配套','环境确认','环境审核','测试用例分配','执行测试','测试完成','数据审核']; // 9步:原第10步"任务结束"已裁撤,数据审核双审通过即完结
 
+// 终态意识统一出口(v11扩散,2026-09-24用户:测试任务/我的任务都有这问题): done/closed任务current_step
+// 停在9(改动7数据面遗留), 应显示「已完成」而非困在最后环节——表格徽章/详情横幅/筛选候选全订阅此处
+function stepLabel(t) {
+  if (t.status === 'done' || t.status === 'closed') return '已完成';
+  return (t.current_step || '-') + '. ' + (t.current_step_name || STEP_NAMES[t.current_step - 1] || '—');
+}
+
 function statusBadge(st) {
   const [label, cls] = STATUS_MAP[st] || [st, 'badge-gray'];
   return `<span class="badge ${cls}">${label}</span>`;
@@ -1909,7 +1916,7 @@ function onTaskSearch() {
           <span style="font-size:12px;color:var(--text-sub)">${t.progress}%</span>
         </div>
       </td>
-      <td><span class="badge badge-gray" style="font-size:11px">${t.current_step}. ${t.current_step_name || STEP_NAMES[t.current_step-1] || '—'}</span></td>
+      <td><span class="badge badge-gray" style="font-size:11px">${stepLabel(t)}</span></td>
       <td style="font-size:12px">${esc(t.current_step === 9 ? `PL:${userName(t.owner)} + TSE:${userName(t.tse_id)}` : (t.current_step_assignee_name || userName(t.owner)))}</td>
       <td class="muted" style="font-size:12px">${(t.created_at || '').slice(0, 10)}</td>
     </tr>`).join('');
@@ -2053,7 +2060,7 @@ function renderTaskNavTasks() {
           <span style="font-size:12px;color:var(--text-sub)">${t.progress}%</span>
         </div>
       </td>
-      <td><span class="badge badge-gray" style="font-size:11px">${t.current_step}. ${t.current_step_name || STEP_NAMES[t.current_step-1] || '—'}</span></td>
+      <td><span class="badge badge-gray" style="font-size:11px">${stepLabel(t)}</span></td>
       <td style="font-size:12px">${esc(t.current_step === 9 ? `PL:${userName(t.owner)} + TSE:${userName(t.tse_id)}` : (t.current_step_assignee_name || userName(t.owner)))}</td>
       <td class="muted" style="font-size:12px">${(t.created_at || '').slice(0, 10)}</td>
       <td onclick="event.stopPropagation()" style="text-align:center">
@@ -2079,7 +2086,7 @@ function renderRecent(tasks) {
       <td style="font-weight:500">${esc(t.name)}</td>
       <td>${esc(t.version || '—')}</td>
       <td>${t.progress}%</td>
-      <td>${t.current_step}. ${t.current_step_name || STEP_NAMES[t.current_step-1] || '—'}</td>
+      <td>${stepLabel(t)}</td>
       <td style="font-size:12px">${esc(t.current_step === 9 ? `PL:${userName(t.owner)} + TSE:${userName(t.tse_id)}` : (t.current_step_assignee_name || userName(t.owner)))}</td>
     </tr>`).join('') || '<tr><td colspan="6" class="empty">暂无任务</td></tr>';
 }
@@ -2113,7 +2120,7 @@ async function openTask(id) {
   document.getElementById('dProgressText').textContent = t.progress + '%';
   document.getElementById('dStepText').textContent = t.status === 'done'
     ? '✅ 已全部完成（数据审核通过即完结，原"任务结束"环节已裁撤）'
-    : `第${t.current_step}步：${t.current_step_name || STEP_NAMES[t.current_step-1] || '—'}`;
+    : `第${t.current_step}步：${stepLabel(t).replace(/^\d+\. /, '')}`;
   await loadSteps(id);  // loadSteps 内部会渲染步骤导航+页面, 并加载用例/问题/历史
 }
 
