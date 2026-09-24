@@ -501,6 +501,7 @@ tbody tr.clickable { cursor: pointer; }
         <div class="stat-card clickable" title="点击查看已完成任务列表" onclick="openStatCard('done')"><div class="icon" style="background:var(--warning-bg);color:var(--warning)">✔</div><div><div class="num" id="statDone" style="color:var(--warning)">0</div><div class="label" style="color:var(--warning);font-weight:600">已完成</div></div><div class="chev">›</div></div>
         <div class="stat-card clickable" title="点击查看未关闭问题单列表" onclick="openStatCard('issues')"><div class="icon" style="background:var(--danger-bg);color:var(--danger)">🐞</div><div><div class="num" id="statIssues" style="color:var(--danger)">0</div><div class="label" style="color:var(--danger);font-weight:600">未关闭问题</div></div><div class="chev">›</div></div>
       </div>
+      <div class="tb-ovstrip" id="tbOvStrip">—</div>
       <div class="tb-seg"><span class="tb-seg-t">我的任务看板</span><span id="tbScopeHint">—</span></div>
       <div class="stats-grid">
         <div class="stat-card clickable" title="超出结束日期的在飞任务(done/closed不入盘)" onclick="tbOpen('late')"><div class="icon" style="background:var(--danger-bg);color:var(--danger)">⏰</div><div><div class="num" id="tbLate" style="color:var(--danger)">0</div><div class="label" style="color:var(--danger);font-weight:600">已超期</div></div><div class="chev">›</div></div>
@@ -514,6 +515,9 @@ tbody tr.clickable { cursor: pointer; }
 .tb-seg{display:flex;align-items:baseline;gap:10px;margin:20px 2px 12px}
 .tb-seg-t{font-size:15px;font-weight:700}
 #tbScopeHint{margin-left:auto;font-size:11px;color:var(--text-sub);opacity:.75;font-weight:400}
+/* v15(2026-09-24用户拍板B摘要行): 任务总览时效速览条,插于两段之间,纯文字不可点(下钻仍走四卡/四弹层) */
+.tb-ovstrip{margin:-6px 2px 0;font-size:12px;color:var(--text-sub);letter-spacing:.2px}
+.tb-ovstrip b{font-weight:700}
 .tb-who{display:inline-block;background:var(--primary-light);color:var(--primary);border-radius:4px;padding:1px 6px;font-size:11px;margin:1px}
 .tb-exp{color:var(--text-sub);font-size:11px}
 .tb-name{max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -5613,6 +5617,16 @@ function tbRefresh() { // 全量重算四数+视角角标; 非工作台壳(tbLat
   document.getElementById('tbOn').textContent = c.ontime;
   document.getElementById('tbNs').textContent = c.nosched;
   document.getElementById('tbScopeHint').textContent = '名下视野 ' + scoped.length + ' 项';
+  // v15(2026-09-24用户:任务总览也应体现超期/临期/正常等状态,拍板B不可点摘要行): 全集分箱一行速览;
+  // 终态两端(已完成/未关闭问题)已由上栅专卡正名,此处只补时效四态,不与专卡抢戏
+  const gg = { late: 0, soon: 0, ontime: 0, nosched: 0, finished: 0 };
+  allTasksCache.forEach(function (t) { gg[tbEval(t).bucket]++; });
+  const ov = document.getElementById('tbOvStrip');
+  if (ov) ov.innerHTML = '<span>全体 ' + allTasksCache.length + ' 个任务的时效:</span>'
+    + ' <span style="color:var(--danger)">已超期 <b>' + gg.late + '</b></span> ·'
+    + ' <span style="color:var(--warning)">临期 <b>' + gg.soon + '</b></span> ·'
+    + ' <span style="color:var(--success)">进度正常 <b>' + gg.ontime + '</b></span> ·'
+    + ' <span>未排期 <b>' + gg.nosched + '</b></span>';
 }
 const TB_META = {
   late:    ['已超期任务', 'var(--danger)', '超出结束日期的在飞任务'],
