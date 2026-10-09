@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, and_
 
 from app.db.database import get_db
 from app.core.security import get_current_user, require_admin
@@ -125,12 +125,15 @@ async def delete_user(
         raise HTTPException(status_code=404, detail="用户不存在")
     if user.account == "admin":
         raise HTTPException(status_code=400, detail="管理员账号不可删除")
-    # 检查是否有关联测试任务（只统计未删除的任务，软删除不算）
+    # 检查是否有关联测试任务(2026-10-08修复:排除已软删除的僵尸任务,否则用户会被历史任务永久锁死;
+    # 用 isnot(True) 而非 ==False —— deleted 可能为 NULL(老数据),IS NOT TRUE 能覆盖 NULL 不漏)
     task_cnt = (await db.execute(
         select(func.count(TestTask.id)).where(
-            ((TestTask.owner == user_id) | (TestTask.tse_id == user_id) |
-            (TestTask.version_owner == user_id) | (TestTask.executor_id == user_id))
-            & (TestTask.deleted == False)
+            and_(
+                (TestTask.owner == user_id) | (TestTask.tse_id == user_id) |
+                (TestTask.version_owner == user_id) | (TestTask.executor_id == user_id),
+                TestTask.deleted.isnot(True)
+            )
         )
     )).scalar()
     if task_cnt > 0:
