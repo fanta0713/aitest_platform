@@ -414,8 +414,12 @@ def _fmt_steps_multiline(steps):
     return '\n'.join(lines)
 
 
-def _build_tracking_row(case, issues_by_link, nm):
-    """单条用例 → 报表行（9 列，与 TRACKING_HEADERS 严格一一对应）"""
+def _build_tracking_row(case, issues_by_link, nm, depth=3):
+    """单条用例 → 报表行（列数与调用方表头严格一致）
+
+    注意：默认值必须写常量，不能写 len(TRACKING_MODULE_HEADERS)——
+    该常量定义在本函数之后，默认参数在 def 时求值会 NameError。
+    """
     lr = case.get('latest_result') or {}
     status = lr.get('status') or ''
     steps = _as_dict(case.get('steps')) or []
@@ -448,6 +452,7 @@ def _build_tracking_row(case, issues_by_link, nm):
     return [
         ('s', case.get('local_case_id') or case.get('zentao_case_id') or ''),
         ('s', case.get('title') or ''),
+    ] + _module_cells(case, depth) + [
         ('s', case.get('precondition') or ''),
         ('s', _fmt_steps_multiline(steps)),
         ('s', nm(lr.get('executor_id')) if lr.get('executor_id') else ''),
@@ -468,10 +473,25 @@ def _fmt_dt_str(s):
         return str(s)
 
 
-TRACKING_HEADERS = ['ID', '用例名称', '前置条件', '步骤', '执行人', '执行时间',
-                    '测试结果', '失败/阻塞原因', 'Bug信息']
+TRACKING_BASE_HEADERS = ['ID', '用例名称']
+# 模块层级列：拆成多列而非拼成「A / B / C」一列，好处是 Excel 里能按任一级筛选/排序/透视
+TRACKING_MODULE_HEADERS = ['一级模块', '二级模块', '三级模块']
+TRACKING_TAIL_HEADERS = ['前置条件', '步骤', '执行人', '执行时间',
+                         '测试结果', '失败/阻塞原因', 'Bug信息']
 # 列宽（字符数）：步骤与原因列给足，ID/结果列收窄
-TRACKING_WIDTHS = [8, 34, 26, 52, 10, 17, 9, 34, 32]
+TRACKING_BASE_WIDTHS = [8, 32]
+TRACKING_MODULE_WIDTHS = [18, 20, 24]
+TRACKING_TAIL_WIDTHS = [26, 52, 10, 17, 9, 34, 32]
+
+
+def _module_cells(case, depth):
+    """把 module_path 拆成 depth 个单元格；不足补空，超长则并入最后一格"""
+    path = case.get('module_path') or []
+    cells = [('s', path[i] if i < len(path) else '') for i in range(depth)]
+    if len(path) > depth and depth > 0:
+        extra = path[depth - 1:]
+        cells[-1] = ('s', ' / '.join(extra))
+    return cells
 
 
 @router.get("/{task_id}/export/test-tracking")
@@ -508,19 +528,28 @@ async def export_test_tracking(
             'status_zh': _ISSUE_STATUS_ZH.get(it.status, it.status or ''),
         })
 
-    rows = [[('s', h) for h in TRACKING_HEADERS]]
+    # 模块层级列数按本任务实际最大深度决定（至少 3 级，更深则动态加列，不会丢数据）
+    max_depth = max([len(c.get('module_path') or []) for c in cases] or [0])
+    depth = max(3, max_depth)
+    module_headers = TRACKING_MODULE_HEADERS + \
+        [f"{n}级模块" for n in range(len(TRACKING_MODULE_HEADERS) + 1, depth + 1)]
+    module_widths = TRACKING_MODULE_WIDTHS + [22] * (depth - len(TRACKING_MODULE_HEADERS))
+    headers = TRACKING_BASE_HEADERS + module_headers + TRACKING_TAIL_HEADERS
+    widths = TRACKING_BASE_WIDTHS + module_widths + TRACKING_TAIL_WIDTHS
+
+    rows = [[('s', h) for h in headers]]
     if not cases:
-        rows.append([('s', '') for _ in TRACKING_HEADERS])
+        rows.append([('s', '') for _ in headers])
         rows[-1][1] = ('s', '（该任务暂未关联用例）')
     else:
         for c in cases:
-            row = _build_tracking_row(c, issues_by_link, nm)
+            row = _build_tracking_row(c, issues_by_link, nm, depth)
             # 列数守卫：表头与数据行一旦不等长，Excel 里会整列错位且不报错
-            assert len(row) == len(TRACKING_HEADERS), \
-                f"列数不匹配: 表头{len(TRACKING_HEADERS)} vs 数据{len(row)}"
+            assert len(row) == len(headers), \
+                f"列数不匹配: 表头{len(headers)} vs 数据{len(row)}"
             rows.append(row)
 
-    xlsx = build_xlsx_single('测试跟踪记录表', rows, TRACKING_WIDTHS)
+    xlsx = build_xlsx_single('测试跟踪记录表', rows, widths)
     filename = f"test_tracking_{task.code}.xlsx"
     return Response(
         content=xlsx,
