@@ -3967,6 +3967,40 @@ async function exportTestPlan(taskId) {
   }
 }
 
+// 导出测试跟踪记录表（步骤8「测试完成」：步骤7 的用例与执行结果汇总）
+async function exportTestTracking(taskId) {
+  try {
+    toast('正在生成测试跟踪记录表…');
+    const resp = await fetch(API + '/api/tasks/' + taskId + '/export/test-tracking', {
+      method: 'GET',
+      credentials: 'same-origin',
+    });
+    if (resp.status === 401) { showLogin(); throw new Error('未登录'); }
+    if (!resp.ok) {
+      let msg = '导出失败（' + resp.status + '）';
+      try { const j = await resp.json(); if (j && j.detail) msg = j.detail; } catch (e) {}
+      toast(msg, true);
+      return;
+    }
+    const blob = await resp.blob();
+    const cd = resp.headers.get('Content-Disposition') || '';
+    let fname = 'test_tracking.xlsx';
+    const m = cd.match(/filename="?([^";]+)"?/);
+    if (m) fname = m[1];
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fname;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    toast('测试跟踪记录表已导出');
+  } catch (e) {
+    toast('导出失败：' + (e && e.message ? e.message : e), true);
+  }
+}
+
 // 步骤2「关联用例」单行：序号 + 标题 + 状态 + 取消关联
 function step2CaseRow(c, seq, canEdit, taskId) {
   const statusBadge = c.latest_result
@@ -4829,6 +4863,7 @@ function renderStepPage(stepNo) {
           return names.length ? esc(names.join('、')) : '—';
         })() : '—') : (s.assigned_to ? esc(userName(s.assigned_to)) : (s.step === 9 && currentTask ? `PL:${esc(userName(currentTask.owner))} + TSE:${esc(userName(currentTask.tse_id))}` : '全员'))}</span>
       </div>
+      ${s.step === 8 ? `<button class="btn btn-sm" onclick="exportTestTracking(${taskId})">⬇ 导出测试跟踪记录表</button>` : ''}
     </div>
     <div style="padding:16px 20px">
       ${s.remark ? `<div class="step-desc" style="margin-bottom:10px">${esc(s.remark)}</div>` : ''}
