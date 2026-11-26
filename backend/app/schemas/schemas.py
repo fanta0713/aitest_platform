@@ -14,13 +14,17 @@ class TaskCreate(BaseModel):
     project_id: int = Field(..., description="所属项目ID")
     version: Optional[str] = None
     test_type: str = "integration"
-    begin_date: Optional[date] = None
-    end_date: Optional[date] = None
-    owner: int
-    tse_id: Optional[int] = None
-    version_owner: Optional[int] = None
-    executor_id: Optional[int] = None
-    executors: Optional[List[dict]] = None
+    # 2026-11-26：以下字段全部必填。原因——它们直接决定 9 步流程的环节负责人
+    # （owner→环节1/5、tse_id→环节2、version_owner→环节3/4/6/8、executor_id→环节7），
+    # 任一留空都会让该环节 assigned_to 为 NULL，落到"角色兜底"这条软路径上
+    # （历史 bug：任务119 TSE 留空 → 环节2 没人有权操作）。
+    begin_date: date = Field(..., description="任务开始日期（必填）")
+    end_date: date = Field(..., description="任务结束日期（必填）")
+    owner: int = Field(..., description="PL 负责人（决定环节1/5）")
+    tse_id: int = Field(..., description="TSE（决定环节2）")
+    version_owner: int = Field(..., description="版本负责人（决定环节3/4/6/8）")
+    executor_id: int = Field(..., description="测试执行人（决定环节7）")
+    executors: Optional[List[dict]] = Field(None, description="额外测试执行人（可选，非必填）")
     description: Optional[str] = None
 
 
@@ -59,6 +63,7 @@ class TaskResponse(BaseModel):
     test_type: str
     begin_date: Optional[date]
     end_date: Optional[date]
+    actual_end_date: Optional[datetime] = None  # 实际完成时间（末环完成封卷时写入，被打回重开则清空）
     owner: int
     tse_id: Optional[int]
     version_owner: Optional[int]
@@ -93,6 +98,7 @@ class StepResponse(BaseModel):
     status: str
     begin_date: Optional[datetime]
     end_date: Optional[datetime]
+    rounds: Optional[List[dict]] = None  # 环节各轮实际起止[{n,start,end,outcome}]
     remark: Optional[str]
     ext_data: Optional[dict] = None
 

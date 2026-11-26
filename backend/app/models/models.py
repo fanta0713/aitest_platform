@@ -129,6 +129,7 @@ class TestTask(Base):
     test_type = Column(String(30), default=TestType.integration.value, comment="测试类型")
     begin_date = Column(Date, nullable=True, comment="开始日期")
     end_date = Column(Date, nullable=True, comment="结束日期")
+    actual_end_date = Column(DateTime(timezone=True), nullable=True, comment="实际完成时间（末环完成封卷时写入，被打回重开则清空）")
     owner = Column(Integer, nullable=False, comment="PL负责人")
     tse_id = Column(Integer, nullable=True, comment="TSE负责人")
     version_owner = Column(Integer, nullable=True, comment="版本负责人")
@@ -171,6 +172,12 @@ class TaskStep(Base):
     status = Column(String(30), default=StepStatus.pending.value, comment="状态")
     begin_date = Column(DateTime(timezone=True), nullable=True)
     end_date = Column(DateTime(timezone=True), nullable=True)
+    # 环节各轮实际起止：每被打回一次就多一轮，形如
+    # [{"n":1,"start":"2026-11-20T01:00:00+00:00","end":"2026-11-21T10:00:00+00:00","outcome":"rejected"},
+    #  {"n":2,"start":"...","end":null,"outcome":null}]
+    # outcome: completed(本轮已提交完成) / rejected(本轮结果被打回) / in_progress(本轮进行中) / null(未收口)
+    # begin_date/end_date 仍保留为"最近一轮"的镜像，老逻辑与老数据零影响
+    rounds = Column(JSON, nullable=True, comment="环节各轮实际起止[{n,start,end,outcome}]")
     remark = Column(Text, nullable=True, comment="备注")
     ext_data = Column(JSON, nullable=True, comment="准出条件数据(JSON)")
     created_at = Column(DateTime(timezone=True), server_default=func.now())
@@ -306,6 +313,88 @@ class TestCase(Base):
 
     library = relationship("CaseLibrary", back_populates="cases")
     module = relationship("CaseModule", back_populates="cases")
+
+
+# 版本配套表（可复用基线，任务进入第三阶段时复制为快照）
+class VersionConfig(Base):
+    __tablename__ = "version_configs"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    name = Column(String(200), nullable=False, comment="配套表名称")
+    product_id = Column(Integer, ForeignKey("products.id", ondelete="SET NULL"), nullable=True, index=True, comment="适用产品，空=通用")
+    model_key = Column(String(100), nullable=True, comment="机型/版本标识，如 TR4A")
+    description = Column(Text, nullable=True)
+    is_active = Column(Boolean, default=True, comment="是否启用")
+    created_by = Column(Integer, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    items = relationship(
+        "VersionConfigItem", back_populates="config",
+        cascade="all, delete-orphan", order_by="VersionConfigItem.sort_order",
+    )
+
+
+class VersionConfigItem(Base):
+    __tablename__ = "version_config_items"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    config_id = Column(Integer, ForeignKey("version_configs.id", ondelete="CASCADE"), nullable=False, index=True)
+    node_type = Column(String(50), default="计算节点", comment="配置大类")
+    group_type = Column(String(50), default="未分组", comment="软硬件分组")
+    component_model = Column(String(200), nullable=True, comment="型号，可空")
+    item_name = Column(String(200), nullable=False, comment="一级分类/配套项")
+    required_value = Column(String(500), nullable=True, comment="要求版本，始终按字符串保存")
+    is_applicable = Column(Boolean, default=True, comment="是否适用")
+    remark = Column(Text, nullable=True)
+    sort_order = Column(Integer, default=0)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    config = relationship("VersionConfig", back_populates="items")
+
+
+# 任务版本配套快照头（模板后续修改不影响历史任务）
+class TaskVersionConfig(Base):
+    __tablename__ = "task_version_configs"
+    __table_args__ = (
+        UniqueConstraint("task_id", name="uq_task_version_config_task"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    task_id = Column(Integer, ForeignKey("test_tasks.id", ondelete="CASCADE"), nullable=False, index=True)
+    step_id = Column(Integer, ForeignKey("task_steps.id", ondelete="SET NULL"), nullable=True)
+    config_id = Column(Integer, ForeignKey("version_configs.id", ondelete="SET NULL"), nullable=True)
+    config_name = Column(String(200), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    items = relationship(
+        "TaskVersionItem", back_populates="task_config",
+        cascade="all, delete-orphan", order_by="TaskVersionItem.sort_order",
+    )
+
+
+class TaskVersionItem(Base):
+    __tablename__ = "task_version_items"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    task_config_id = Column(Integer, ForeignKey("task_version_configs.id", ondelete="CASCADE"), nullable=False, index=True)
+    source_item_id = Column(Integer, nullable=True)
+    node_type = Column(String(50), default="计算节点")
+    group_type = Column(String(50), default="未分组")
+    component_model = Column(String(200), nullable=True)
+    item_name = Column(String(200), nullable=False)
+    required_value = Column(String(500), nullable=True)
+    is_applicable = Column(Boolean, default=True)
+    is_checked = Column(Boolean, default=False)
+    actual_value = Column(String(500), nullable=True, comment="预留：实际版本")
+    check_result = Column(String(20), default="pending", comment="pending/ok/na/mismatch")
+    remark = Column(Text, nullable=True)
+    checked_by = Column(Integer, nullable=True)
+    checked_at = Column(DateTime(timezone=True), nullable=True)
+    sort_order = Column(Integer, default=0)
+
+    task_config = relationship("TaskVersionConfig", back_populates="items")
 
 
 # 步骤附件表（环境自检报告等）

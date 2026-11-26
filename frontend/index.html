@@ -174,6 +174,25 @@ input, select, textarea { font-family: inherit; font-size: 14px; outline: none; 
 .btn-primary { background: var(--primary); border-color: var(--primary); color: #fff; }
 .btn-primary:hover { background: var(--primary-hover); border-color: var(--primary-hover); }
 .btn-sm { padding: 5px 10px; font-size: 12px; border-radius: 6px; }
+.btn:disabled, .btn[disabled] { opacity: .45; cursor: not-allowed; }
+.btn:disabled:hover, .btn[disabled]:hover { border-color: var(--border); background: #fff; }
+.btn-primary:disabled:hover, .btn-primary[disabled]:hover { background: var(--primary); border-color: var(--primary); }
+/* 环节未点「开始」时整块操作区锁定：置灰 + 拦截一切交互，只留顶部「开始」按钮可点 */
+.step-lock { position: relative; }
+.step-lock-inner { pointer-events: none; user-select: none; opacity: .5; filter: grayscale(50%); }
+.step-lock-mask { position: absolute; inset: 0; display: flex; align-items: flex-start; justify-content: center; padding-top: 44px; pointer-events: none; }
+.step-lock-tip { background: #fff; border: 1px dashed #cbd5e1; border-radius: 10px; padding: 12px 22px; text-align: center; font-size: 13px; color: var(--text-sub); box-shadow: var(--shadow); max-width: 460px; line-height: 1.7; }
+/* 环节多轮计时：第N轮徽标 + 历次记录时间线（被打回/回退重做才有第二行） */
+.round-badge { background: var(--primary); color: #fff; border-radius: 10px; padding: 1px 9px; font-size: 11px; font-weight: 600; letter-spacing: .3px; }
+.step-rounds { display: flex; flex-wrap: wrap; gap: 8px; padding: 7px 20px 9px; border-bottom: 1px solid var(--border); background: #fafbfc; font-size: 12px; }
+.round-chip { display: inline-flex; align-items: center; gap: 6px; background: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 3px 10px; color: var(--text-sub); }
+.round-chip b { color: var(--text-main); font-weight: 500; }
+.round-chip i { font-style: normal; font-size: 11px; padding: 0 6px; border-radius: 8px; background: #eef2f7; color: var(--text-sub); }
+.round-chip.rejected { border-color: #fecaca; background: #fef7f7; }
+.round-chip.rejected i { background: var(--danger-bg); color: var(--danger); }
+.round-chip.rolled_back { border-color: #fde68a; background: #fffdf5; }
+.round-chip.rolled_back i { background: #fef3c7; color: #b45309; }
+.round-chip.in_progress i { background: var(--primary-bg, #e8f1ff); color: var(--primary); }
 .btn-danger-text { color: var(--danger); border: none; background: none; padding: 4px 8px; border-radius: 6px; font-size: 12px; }
 .btn-danger-text:hover { background: var(--danger-bg); }
 
@@ -256,6 +275,19 @@ tbody tr.clickable { cursor: pointer; }
 .badge-blue { background: var(--primary-light); color: var(--primary); }
 .badge-green { background: var(--success-bg); color: var(--success); }
 .badge-amber { background: var(--warning-bg); color: var(--warning); }
+
+/* 用例步骤卡片（执行弹窗 / 用例详情共用）：状态按钮独占顶行，文本整宽，不再与按钮同排 */
+.step-card { padding: 12px 0; border-top: 1px dashed var(--border); }
+.step-head { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 6px 8px; margin-bottom: 2px; }
+.step-head-l { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-sub); }
+.step-btns { display: flex; flex-wrap: wrap; gap: 4px; white-space: nowrap; }
+.step-blk { background: #fff; border: 1px solid var(--border); border-radius: 6px; margin-top: 8px; }
+.step-blk-label { font-size: 12px; font-weight: 600; color: var(--text-sub); padding: 3px 10px; border-bottom: 1px solid var(--border); }
+/* pre-wrap 保留原始换行；anywhere 让超长 URL/JSON 在边界强制折行，不溢出到别的列 */
+.step-text { padding: 6px 10px; font-size: 13px; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word; }
+.step-fold .step-text { max-height: 208px; overflow: hidden; }
+.step-more { padding: 3px 10px; border-top: 1px dashed var(--border); font-size: 12px; }
+.step-more span { color: var(--primary); cursor: pointer; }
 .badge-red { background: var(--danger-bg); color: var(--danger); }
 .badge-violet { background: var(--violet-bg); color: var(--violet); }
 .badge-cyan { background: var(--info-bg); color: var(--info); }
@@ -409,6 +441,19 @@ tbody tr.clickable { cursor: pointer; }
 .itree-head { font-weight: 600; }
 .itree-caret { display: inline-block; width: 14px; color: var(--text-sub); }
 .itree-name { flex: 1; }
+/* 第三阶段版本配套核对：整行点击，不再单独占一列复选框 */
+.vc-row { cursor: pointer; transition: background .12s; }
+.vc-row:hover { background: #f8fafc; }
+.vc-row-done { background: #f0fdf4; }
+.vc-row-done:hover { background: #dcfce7; }
+.vc-row-done td:first-child { box-shadow: inset 3px 0 0 var(--success); }
+.vc-row-na { cursor: default; opacity: .62; }
+.vc-row-na:hover { background: transparent; }
+.vc-tick { display: inline-block; width: 22px; color: var(--success); font-weight: 700; }
+.vc-tick-off { color: #cbd5e1; }
+.vc-group td { background: #eef2ff; padding: 7px 12px !important; }
+/* 版本配套表操作按钮：无权限时隐藏（CSS 兜底，动态渲染的行也生效） */
+body:not(.vc-can-manage) .vc-manage-only { display: none !important; }
 </style>
 </head>
 <body>
@@ -623,7 +668,7 @@ tbody tr.clickable { cursor: pointer; }
     <!-- 人员与角色 -->
     <section class="view" id="view-people">
       <div class="page-header">
-        <div><h2>人员与角色</h2><div class="desc">本地用户管理 · 角色决定操作权限</div></div>
+        <div><h2>人员与角色</h2><div class="desc">本地用户管理 · 角色决定操作权限 · 离职请用「停用」，不要用「删除」</div></div>
         <div style="display:flex;gap:10px;align-items:center">
           <div class="role-legend">
             <span><span class="dot" style="background:#dc2626"></span>管理员</span>
@@ -643,13 +688,13 @@ tbody tr.clickable { cursor: pointer; }
       </div>
     </section>
 
-    <!-- 产品与项目 -->
+    <!-- 产品与项目（项目 / 版本配套表 两个页签） -->
     <section class="view" id="view-pp">
       <div class="page-header">
         <div><h2>产品与项目</h2><div class="desc" id="ppDesc">点击左侧产品查看对应项目</div></div>
       </div>
       <div style="display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap">
-        <div class="card" style="width:320px;flex-shrink:0">
+        <div class="card" style="width:320px;flex-shrink:0" id="ppProductCol">
           <div class="card-head" style="display:flex;justify-content:space-between;align-items:center">
             <h3>产品</h3>
             <span class="pp-manage-only"><button class="btn btn-sm btn-primary" onclick="openProductModal(null)">+ 新建</button></span>
@@ -657,15 +702,50 @@ tbody tr.clickable { cursor: pointer; }
           <div id="ppProductList" style="max-height:500px;overflow-y:auto"></div>
         </div>
         <div class="card" style="flex:1;min-width:400px">
-          <div class="card-head" style="display:flex;justify-content:space-between;align-items:center">
-            <h3 id="ppProjectTitle">项目</h3>
-            <span class="pp-manage-only"><button class="btn btn-sm btn-primary" onclick="openProjectModal(null)">+ 新建项目</button></span>
+          <div class="card-head" style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+            <div style="display:flex;gap:6px">
+              <button class="btn btn-sm pp-tab btn-primary" id="ppTabBtnProjects" onclick="switchPPTab('projects')">项目</button>
+              <button class="btn btn-sm pp-tab" id="ppTabBtnVc" onclick="switchPPTab('vc')">版本配套表</button>
+            </div>
+            <span class="pp-manage-only" id="ppActionProjects"><button class="btn btn-sm btn-primary" onclick="openProjectModal(null)">+ 新建项目</button></span>
+            <span class="vc-manage-only" id="ppActionVc" style="display:none"><button class="btn btn-sm btn-primary" onclick="openVersionConfigCreate()">+ 新建版本配套表</button></span>
           </div>
-          <table id="ppProjectTable">
-            <thead><tr><th>名称</th><th>代号</th><th>起止日期</th><th style="width:120px">操作</th></tr></thead>
-            <tbody id="ppProjectBody"><tr><td colspan="4" class="muted" style="padding:12px">请先在左侧选择一个产品</td></tr></tbody>
-          </table>
-          <div id="ppOrphanBox" style="margin-top:16px;display:none"></div>
+
+          <!-- 页签1：项目 -->
+          <div id="ppTabProjects">
+            <div class="muted" id="ppProjectTitle" style="font-size:12px;margin-bottom:8px"></div>
+            <table id="ppProjectTable">
+              <thead><tr><th>名称</th><th>代号</th><th>起止日期</th><th style="width:120px">操作</th></tr></thead>
+              <tbody id="ppProjectBody"><tr><td colspan="4" class="muted" style="padding:12px">请先在左侧选择一个产品</td></tr></tbody>
+            </table>
+            <div id="ppOrphanBox" style="margin-top:16px;display:none"></div>
+          </div>
+
+          <!-- 页签2：版本配套表（按左侧选中产品过滤：本产品专属 + 通用） -->
+          <div id="ppTabVc" style="display:none">
+            <div id="vcListView">
+              <div id="vcListWrap"></div>
+            </div>
+            <div id="vcDetailView" style="display:none">
+              <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:12px">
+                <div style="display:flex;align-items:center;gap:10px">
+                  <button class="btn btn-sm" onclick="backToVersionConfigList()">← 返回</button>
+                  <div>
+                    <h3 style="margin:0" id="vcDetailTitle">版本配套表</h3>
+                    <div class="muted" style="font-size:12px" id="vcDetailDesc">—</div>
+                  </div>
+                </div>
+                <div style="display:flex;gap:8px;flex-wrap:wrap">
+                  <span class="vc-manage-only"><button class="btn btn-sm" onclick="openVersionConfigEdit(currentVcId)">✎ 编辑</button></span>
+                  <span class="vc-manage-only"><button class="btn btn-sm" onclick="openVersionConfigItemModal(null)">+ 添加条目</button></span>
+                  <span class="vc-manage-only"><button class="btn btn-sm" onclick="openVersionConfigCreate(currentVcId)">⧉ 复制</button></span>
+                  <button class="btn btn-sm" onclick="exportVersionConfig(currentVcId)">⬇ 导出</button>
+                  <span class="vc-manage-only"><button class="btn btn-sm" style="color:var(--danger)" onclick="deleteVersionConfig(currentVcId)">删除配套表</button></span>
+                </div>
+              </div>
+              <div id="vcDetailWrap"></div>
+            </div>
+          </div>
         </div>
       </div>
     </section>
@@ -800,14 +880,14 @@ tbody tr.clickable { cursor: pointer; }
       <div class="field"><label>任务名称 *</label><input id="cName" placeholder="如：IRACK v3r3b01 冒烟测试"></div>
       <div class="form-row">
         <div class="field">
-          <label>待测产品</label>
+          <label>待测产品 *</label>
           <div style="display:flex;gap:8px">
             <select id="cProduct" style="flex:1" onchange="onProductChange()"></select>
             <span class="pp-manage-only"><button type="button" class="btn btn-sm" onclick="openProductCreateModal()">+ 新建产品</button></span>
           </div>
         </div>
         <div class="field">
-          <label>所属项目</label>
+          <label>所属项目 *</label>
           <div style="display:flex;gap:8px">
             <select id="cProject" style="flex:1" onchange="onProjectChange()"></select>
             <span class="pp-manage-only"><button type="button" class="btn btn-sm" onclick="openProjectCreateModal()">+ 新建项目</button></span>
@@ -827,17 +907,17 @@ tbody tr.clickable { cursor: pointer; }
         <div class="field"><label>PL（负责人）*</label><select id="cOwner"></select></div>
       </div>
       <div class="form-row">
-        <div class="field"><label>TSE</label><select id="cTse"></select></div>
-        <div class="field"><label>版本负责人</label><select id="cVersionOwner"></select></div>
+        <div class="field"><label>TSE *</label><select id="cTse"></select></div>
+        <div class="field"><label>版本负责人 *</label><select id="cVersionOwner"></select></div>
       </div>
       <div class="form-row">
-        <div class="field"><label>测试执行人</label><select id="cExecutor" onchange="refreshExecutorOptions()"></select></div>
+        <div class="field"><label>测试执行人 *</label><select id="cExecutor" onchange="refreshExecutorOptions()"></select></div>
         <div class="field"><label>&nbsp;</label><button type="button" class="btn btn-sm" style="margin-top:4px" onclick="addExecutorRow()">+ 增加测试执行人</button></div>
       </div>
       <div id="executorsList" style="margin:-4px 0 8px"></div>
       <div class="form-row">
-        <div class="field"><label>开始日期</label><input id="cBegin" type="date"></div>
-        <div class="field"><label>结束日期</label><input id="cEnd" type="date"></div>
+        <div class="field"><label>开始日期 *</label><input id="cBegin" type="date"></div>
+        <div class="field"><label>结束日期 *</label><input id="cEnd" type="date"></div>
       </div>
       <div class="field"><label>任务描述</label><textarea id="cDesc" rows="3" placeholder="测试范围、目标等"></textarea></div>
     </div>
@@ -1074,6 +1154,86 @@ tbody tr.clickable { cursor: pointer; }
   </div>
 </div>
 
+<!-- 新建版本配套表 -->
+<div class="modal-mask" id="versionConfigModal">
+  <div class="modal" style="width:560px">
+    <div class="modal-head"><h3>新建版本配套表</h3><button class="modal-close" onclick="closeModal('versionConfigModal')">×</button></div>
+    <div class="modal-body">
+      <div class="field"><label>名称 *</label><input id="vcName" placeholder="如：TR4A过点版本"></div>
+      <div class="field"><label>复制自（可选）</label>
+        <select id="vcCopyFrom" onchange="onVcCopyFromChange()"><option value="">不复制，从空白开始</option></select>
+        <div class="muted" style="font-size:11px;margin-top:4px">选一份已有配套表，会把全部条目复制过来，适合新产品/新机型在此基础上改版本号。</div>
+      </div>
+      <div class="form-row">
+        <div class="field"><label>适用产品 *</label><select id="vcProduct"><option value="">请选择产品</option></select></div>
+        <div class="field"><label>机型/版本标识</label><input id="vcModelKey" placeholder="如 TR4A"></div>
+      </div>
+      <div class="field"><label>说明</label><textarea id="vcDesc" rows="2" placeholder="可选"></textarea></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn" onclick="closeModal('versionConfigModal')">取消</button>
+      <button class="btn btn-primary" onclick="createVersionConfig()">创建</button>
+    </div>
+  </div>
+</div>
+
+<!-- 编辑版本配套表（名称/适用产品/机型标识/说明） -->
+<div class="modal-mask" id="vcEditModal">
+  <div class="modal" style="width:560px">
+    <div class="modal-head"><h3>编辑版本配套表</h3><button class="modal-close" onclick="closeModal('vcEditModal')">×</button></div>
+    <div class="modal-body">
+      <input type="hidden" id="vcEditId">
+      <div class="field"><label>名称 *</label><input id="vcEditName" placeholder="如：TR4A过点版本"></div>
+      <div class="form-row">
+        <div class="field"><label>适用产品 *</label><select id="vcEditProduct"><option value="">请选择产品</option></select></div>
+        <div class="field"><label>机型/版本标识</label><input id="vcEditModelKey" placeholder="如 TR4A"></div>
+      </div>
+      <div class="field"><label>说明</label><textarea id="vcEditDesc" rows="2" placeholder="可选"></textarea></div>
+      <div class="muted" style="font-size:11px">只改这份配套表本身：条目不变；已经生成的「任务版本配套表」是快照，不受影响。改「适用产品」后，它会出现在新产品的任务里，原产品的任务不再列出。</div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn" onclick="closeModal('vcEditModal')">取消</button>
+      <button class="btn btn-primary" onclick="saveVersionConfigEdit()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- 新增/编辑版本配套条目 -->
+<div class="modal-mask" id="versionConfigItemModal">
+  <div class="modal" style="width:560px">
+    <div class="modal-head"><h3 id="vcItemTitle">添加条目</h3><button class="modal-close" onclick="closeModal('versionConfigItemModal')">×</button></div>
+    <div class="modal-body">
+      <input type="hidden" id="vcItemId">
+      <div class="form-row">
+        <div class="field"><label>配置大类 *</label>
+          <select id="vcItemNode"><option value="计算节点">计算节点</option><option value="交换节点">交换节点</option><option value="其他">其他</option></select>
+        </div>
+        <div class="field"><label>一级分类 *</label><input id="vcItemName" placeholder="如 BIOS、MB CPLD"></div>
+      </div>
+      <div class="field"><label>要求版本</label><input id="vcItemVersion" placeholder="如 V003；填 / 表示不适用"></div>
+      <div class="field"><label>备注</label><textarea id="vcItemRemark" rows="2" placeholder="可选"></textarea></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn" onclick="closeModal('versionConfigItemModal')">取消</button>
+      <button class="btn btn-primary" onclick="saveVersionConfigItem()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- 第三阶段配套项备注 -->
+<div class="modal-mask" id="taskVcNoteModal">
+  <div class="modal" style="width:500px">
+    <div class="modal-head"><h3 id="taskVcNoteTitle">配套项备注</h3><button class="modal-close" onclick="closeModal('taskVcNoteModal')">×</button></div>
+    <div class="modal-body">
+      <div class="field"><label>备注</label><textarea id="taskVcNoteInput" rows="4" placeholder="例如：实际环境使用同系列替代版本，已与 PL 确认。"></textarea></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn" onclick="closeModal('taskVcNoteModal')">取消</button>
+      <button class="btn btn-primary" onclick="saveTaskVcNote()">保存备注</button>
+    </div>
+  </div>
+</div>
+
 <!-- 用例编辑弹窗 -->
 <div class="modal-mask" id="caseEditModal">
   <div class="modal" style="width:720px">
@@ -1087,7 +1247,7 @@ tbody tr.clickable { cursor: pointer; }
         <div class="field"><label>优先级</label><select id="cePri"><option value="1">P1</option><option value="2">P2</option><option value="3" selected>P3</option><option value="4">P4</option></select></div>
         <div class="field"><label>类型</label><select id="ceType"><option value="feature">功能</option><option value="performance">性能</option><option value="integration">集成</option><option value="unit">单元</option><option value="other">其他</option></select></div>
       </div>
-      <div class="field"><label>前置条件</label><textarea id="cePrecond" rows="2" placeholder="测试前置条件"></textarea></div>
+      <div class="field"><label>前置条件</label><textarea id="cePrecond" rows="4" wrap="soft" placeholder="测试前置条件" style="min-height:104px;resize:vertical;line-height:1.5"></textarea></div>
       <div class="field"><label>测试步骤</label><div id="ceSteps"></div><button type="button" class="btn btn-sm" style="margin-top:6px" onclick="addCaseStep()">+ 添加步骤</button></div>
       <div class="form-row">
         <div class="field"><label>阶段</label><select id="ceStage"><option value="unit">单元</option><option value="feature" selected>功能</option><option value="system">系统</option></select></div>
@@ -1225,7 +1385,7 @@ tbody tr.clickable { cursor: pointer; }
 
 <!-- 用例执行弹窗（步骤7 执行测试时点击用例超链接弹出） -->
 <div class="modal-mask" id="caseExecModal">
-  <div class="modal" style="width:780px;max-height:90vh;display:flex;flex-direction:column">
+  <div class="modal" style="width:860px;max-height:90vh;display:flex;flex-direction:column">
     <div class="modal-head"><h3 id="caseExecTitle">用例执行</h3><button class="modal-close" onclick="closeModal('caseExecModal')">×</button></div>
     <div class="modal-body" id="caseExecBody" style="flex:1;overflow-y:auto"></div>
     <div class="modal-foot" id="caseExecFoot">
@@ -1256,26 +1416,46 @@ let zentaoProductsCache = [];
 let zentaoProjectsCache = [];
 let currentTask = null;
 
+// 默认 30 秒超时：后端卡住/连接半开时，不加超时页面会永远停在「加载中」，用户看不到任何原因
+// （2026-11-26 生产任务90 环节7 一直转圈的排查结论之一）。个别慢接口可用 opts.timeoutMs 覆盖，传 0 表示不限。
+const API_TIMEOUT_MS = 30000;
 async function api(path, opts = {}) {
+  const timeoutMs = opts.timeoutMs === undefined ? API_TIMEOUT_MS : opts.timeoutMs;
   const config = {
     headers: { 'Content-Type': 'application/json' },
     credentials: 'same-origin',
     ...opts,
   };
+  delete config.timeoutMs;
   if (config.body && typeof config.body === 'object') {
     config.body = JSON.stringify(config.body);
   }
-  const resp = await fetch(API + path, config);
-  if (resp.status === 401) {
-    showLogin();
-    throw new Error('未登录');
+  let timer = null;
+  if (timeoutMs && !config.signal && typeof AbortController !== 'undefined') {
+    const ac = new AbortController();
+    config.signal = ac.signal;
+    timer = setTimeout(() => ac.abort(), timeoutMs);
   }
-  const data = await resp.json().catch(() => ({}));
-  if (!resp.ok) {
-    const msg = typeof data.detail === 'string' ? data.detail : '请求失败';
-    throw new Error(msg);
+  try {
+    const resp = await fetch(API + path, config);
+    if (resp.status === 401) {
+      showLogin();
+      throw new Error('未登录');
+    }
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) {
+      const msg = typeof data.detail === 'string' ? data.detail : '请求失败';
+      throw new Error(`${msg}（HTTP ${resp.status}）`);
+    }
+    return data;
+  } catch (e) {
+    if (e && e.name === 'AbortError') {
+      throw new Error(`请求超时：${Math.round(timeoutMs / 1000)} 秒无响应（${path}）`);
+    }
+    throw e;
+  } finally {
+    if (timer) clearTimeout(timer);
   }
-  return data;
 }
 
 function toast(msg, isErr = false) {
@@ -1289,6 +1469,39 @@ function toast(msg, isErr = false) {
 
 function esc(s) {
   return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+// 步骤文本显示前先解码一次 HTML 实体，再交给 esc() 转义（XSS 安全）。
+// 历史禅道导入的步骤文本自带 &quot; / &#039;，直接 esc() 会二次转义，页面上显示成 &quot;（2026-11-26 预发任务133 实测）。
+// 只改显示，不动库里的源数据。
+function decodeEntities(s) {
+  const ta = document.createElement('textarea');
+  ta.innerHTML = String(s == null ? '' : s);
+  return ta.value;
+}
+// 用例步骤文本块：操作 / 预期各一块，整宽显示。超过 STEP_TEXT_FOLD_LINES 行默认折叠（DOM 上直接切换，不重渲染）。
+// expanded 是本弹窗的展开状态集合（Set），重渲染（点状态按钮）后不会重新折叠；key 形如 "0:desc"。
+const STEP_TEXT_FOLD_LINES = 10;
+function stepTextBlock(label, text, key, expanded) {
+  if (!text) return '';
+  const decoded = decodeEntities(text).replace(/\r\n?/g, '\n');
+  const lines = decoded.split('\n').length;
+  const foldable = lines > STEP_TEXT_FOLD_LINES;
+  const isFolded = foldable && !(expanded && expanded.has(key));
+  return `<div class="step-blk${isFolded ? ' step-fold' : ''}" data-lines="${lines}">
+    <div class="step-blk-label">${label}</div>
+    <div class="step-text">${esc(decoded)}</div>
+    ${foldable ? `<div class="step-more"><span onclick="toggleStepText(this, '${key}')">${isFolded ? `展开全文（共 ${lines} 行）` : '收起'}</span></div>` : ''}
+  </div>`;
+}
+function toggleStepText(el, key) {
+  const blk = el.closest('.step-blk');
+  if (!blk) return;
+  const folded = blk.classList.toggle('step-fold');
+  const set = (caseExecCtx && caseExecCtx.expanded && document.getElementById('caseExecModal').classList.contains('show'))
+    ? caseExecCtx.expanded : stepTextExpanded;
+  if (folded) set.delete(key); else set.add(key);
+  el.textContent = folded ? `展开全文（共 ${blk.dataset.lines} 行）` : '收起';
 }
 
 // ============ 登录 ============
@@ -1385,6 +1598,8 @@ async function enterApp() {
 
 const ROLE_LABELS = { admin: '管理员', pl: 'PL', tse: 'TSE', version_owner: '版本负责人', executor: '测试执行', member: '未分配' };
 function canManageTasks() { return currentUser && (currentUser.is_admin || (currentUser.roles || []).some(r => ['admin','pl','tse'].includes(r))); }
+// 版本配套表：PL / TSE / 版本负责人 / 管理员 均可增删改
+function canManageVersionConfig() { return currentUser && (currentUser.is_admin || (currentUser.roles || []).some(r => ['admin','pl','tse','version_owner'].includes(r))); }
 
 function renderUser() {
   if (!currentUser) return;
@@ -1396,6 +1611,10 @@ function renderUser() {
   ['dashCreateBtn','taskCreateBtn'].forEach(id => { const el = document.getElementById(id); if (el) el.style.display = showCreate ? '' : 'none'; });
   // 产品/项目管理操作（新建/编辑/删除）：仅PL/TSE/管理员可见
   document.querySelectorAll('.pp-manage-only').forEach(el => { el.style.display = showCreate ? '' : 'none'; });
+  // 版本配套表操作：PL/TSE/版本负责人/管理员可见
+  const showVc = canManageVersionConfig();
+  document.body.classList.toggle('vc-can-manage', !!showVc);
+  document.querySelectorAll('.vc-manage-only').forEach(el => { el.style.display = showVc ? '' : 'none'; });
 }
 
 // ============ 用户菜单（修改密码 / 退出） ============
@@ -1474,6 +1693,8 @@ function parseViewHash() {
     if (s && /^\d+$/.test(s)) return { view: 'pp', pprod: s };
     return { view: 'pp' };
   }
+  // 兼容旧深链:版本配套表已并入「产品与项目」页签,老书签落到 pp
+  if (v === 'versionConfig') return { view: 'pp' };
   if (v === 'suiteDetail') {
     // 套件详情此前根本不在白名单(刷新直接回工作台);数字段吃一层,缺失段视作套件列表
     return (s && /^\d+$/.test(s)) ? { view: 'suiteDetail', sid: parseInt(s, 10) } : { view: 'suite' };
@@ -1575,7 +1796,10 @@ async function loadMyTasks(mode = 'pending') {
         ? '已完成'
         : (t.current_step_assignee
             ? userName(t.current_step_assignee)
-            : (t.current_step === 9 ? `PL:${userName(t.owner)} + TSE:${userName(t.tse_id)}` : '全员'));
+            : (t.current_step === 9 ? `PL:${userName(t.owner)} + TSE:${userName(t.tse_id)}` : (() => {
+                const lbs = (STEP_ROLE_FALLBACK[t.current_step] || []).map(r => STEP_ROLE_ZH[r]).filter(Boolean).join('/');
+                return lbs ? `未指派（${lbs}）` : '未指派';
+              })()));
       return `<tr class="clickable" onclick="openTask(${t.id})">
         <td style="font-family:monospace;color:var(--primary);font-weight:600">${esc(t.code)}</td>
         <td style="font-weight:500">${esc(t.name)}</td>
@@ -1596,7 +1820,9 @@ async function loadMyTasks(mode = 'pending') {
 // ============ 数据加载 ============
 async function loadUsers() {
   try {
-    usersCache = await api('/api/users');
+    // 带 include_inactive：管理员能拿到已停用（离职）账号，用于人员页展示和姓名回显；
+    // 非管理员后端会忽略该参数，只返回在职账号。候选下拉统一用 activeUsers() 过滤。
+    usersCache = await api('/api/users?include_inactive=1');
   } catch (e) { /* 未登录已处理 */ }
   fillUserSelect('cOwner', true, 'pl');
   fillUserSelect('cTse', false, 'tse');
@@ -1606,11 +1832,15 @@ async function loadUsers() {
   fillUserSelect('mUser');
   renderUserRoles();
 }
+// 在职用户：所有「可选人」的场景都走这里，避免把离职（已停用）人员选进新任务
+function activeUsers() {
+  return (usersCache || []).filter(u => u.is_active !== false);
+}
 function fillUserSelect(id, required = false, roleFilter = null) {
   const sel = document.getElementById(id);
   if (!sel) return;
   const val = sel.value;
-  let users = usersCache;
+  let users = activeUsers();
   if (roleFilter) {
     users = users.filter(u => {
       const roles = u.roles || (u.role ? [u.role] : []);
@@ -1625,8 +1855,13 @@ function fillUserSelect(id, required = false, roleFilter = null) {
       if (!users.includes(cur)) users.unshift(cur);
     }
   }
+  // 现任人员若已停用：仍回显出来并标注，避免编辑老任务时选中项凭空消失
+  if (val && !users.some(u => String(u.id) === String(val))) {
+    const cur = usersCache.find(u => String(u.id) === String(val));
+    if (cur) users.unshift(cur);
+  }
   sel.innerHTML = (required ? '' : '<option value="">— 未指定 —</option>') +
-    users.map(u => `<option value="${u.id}">${esc(u.realname || u.account)}（${esc(u.account)}）</option>`).join('');
+    users.map(u => `<option value="${u.id}">${esc(u.realname || u.account)}（${esc(u.account)}）${u.is_active === false ? ' · 已停用' : ''}</option>`).join('');
   if (val) sel.value = val;
 }
 
@@ -1663,28 +1898,44 @@ async function loadZentaoProjects() {
   fillProjectSelect(prodId);
 }
 
-// 按选中产品过滤项目下拉；prodId 为空时显示全部
+// 按选中产品过滤项目下拉。
+// 2026-11-26：产品没选时**不再显示全部项目**——待测产品是必填项，产品未选就摆出一堆
+// 别家产品下的项目，等于让人先选项目再补产品，还会把项目周期自动带进任务日期。
 function fillProjectSelect(productId) {
   const sel = document.getElementById('cProject');
   if (!sel) return;
   const val = sel.value;
-  let projects = zentaoProjectsCache;
-  if (productId) {
-    projects = projects.filter(p => p.product_id === parseInt(productId));
+  if (!productId) {
+    sel.innerHTML = '<option value="">— 请先选择产品 —</option>';
+    sel.value = '';
+    return;
   }
+  const projects = (zentaoProjectsCache || []).filter(p => p.product_id === parseInt(productId));
   sel.innerHTML = '<option value="">— 选择项目 —</option>' +
     projects.map(p => {
       const hasDate = p.begin_date && p.end_date;
       const label = hasDate ? p.name : `${p.name}（未设置日期）`;
       return `<option value="${p.id}" ${!hasDate ? 'disabled' : ''} title="${hasDate ? '' : '该项目未设置起止日期，请先在产品&项目页编辑'}">${esc(label)}</option>`;
     }).join('');
-  if (val) sel.value = val;
+  // 仅当旧选中项目仍属于当前产品时才保留，否则清空（避免跨产品残留）
+  sel.value = (val && projects.some(p => String(p.id) === String(val))) ? val : '';
+}
+
+// 清空任务起止日期及其 min/max 约束（切产品导致项目失效时用）
+function resetTaskDateInputs() {
+  const beginEl = document.getElementById('cBegin');
+  const endEl = document.getElementById('cEnd');
+  if (beginEl) { beginEl.value = ''; beginEl.min = ''; beginEl.max = ''; }
+  if (endEl) { endEl.value = ''; endEl.min = ''; endEl.max = ''; }
 }
 
 function onProductChange() {
   // 选了产品后，项目下拉只显示该产品下的项目
   const prodId = document.getElementById('cProduct').value;
   fillProjectSelect(prodId);
+  // 产品切换/清空后项目可能失效 → 一并重置日期，避免残留上一个项目的周期
+  const projSel = document.getElementById('cProject');
+  if (!projSel || !projSel.value) resetTaskDateInputs();
 }
 
 function onProjectChange() {
@@ -1773,6 +2024,14 @@ async function createProject() {
     closeModal('projectCreateModal');
     await loadZentaoProjects();
     if (result.id) {
+      // 新建的项目属于 jcProduct 选的产品：若发起任务弹窗还没选产品，顺手带上，
+      // 否则项目下拉里根本没有这个新项目（产品未选时项目列表为空）
+      const prodSel = document.getElementById('cProduct');
+      if (prodSel && !prodSel.value) {
+        fillProductSelect('cProduct');
+        prodSel.value = String(productId);
+      }
+      fillProjectSelect(prodSel ? prodSel.value : '');
       document.getElementById('cProject').value = result.id;
       onProjectChange();
     }
@@ -2118,11 +2377,25 @@ async function openTask(id) {
   document.getElementById('dTitle').textContent = currentTask.name;
   document.getElementById('dStatus').innerHTML = statusBadge(currentTask.status);
   const t = currentTask;
+  // 计划周期 vs 实际完成：实际完成由末环完成封卷时写入，被打回重开会自动清空
+  const _d10 = (x) => (x ? String(x).slice(0, 10) : null);
+  const planTxt = `${_d10(t.begin_date) || '—'} ~ ${_d10(t.end_date) || '—'}`;
+  let actualTxt = t.actual_end_date ? formatDateTime(t.actual_end_date) : '—';
+  if (t.actual_end_date && t.end_date) {
+    const _ld = new Date(t.actual_end_date);
+    const aDay = new Date(_ld.getFullYear(), _ld.getMonth(), _ld.getDate());
+    const _p = String(t.end_date).split('-').map(Number);
+    const eDay = new Date(_p[0], (_p[1] || 1) - 1, _p[2] || 1);
+    const over = Math.round((aDay - eDay) / 86400000);
+    if (over > 0) actualTxt += ` <span style="color:var(--danger)">（超期 ${over} 天）</span>`;
+  }
   document.getElementById('dMeta').innerHTML = `
     <span>所属产品：<b>${esc(t.product_name || '—')}</b></span>
     <span>所属项目：<b>${esc(t.project_name || '—')}</b></span>
     <span>版本：<b>${esc(t.version || '—')}</b></span>
     <span>类型：<b>${{integration:'集成测试',functional:'功能测试',performance:'性能测试',regression:'回归测试'}[t.test_type] || t.test_type}</b></span>
+    <span>计划周期：<b>${planTxt}</b></span>
+    <span>实际完成：<b>${actualTxt}</b></span>
     <span>PL：<b>${esc(userName(t.owner))}</b></span>
     <span>TSE：<b>${esc(userName(t.tse_id))}</b></span>
     <span>版本负责人：<b>${esc(userName(t.version_owner))}</b></span>
@@ -2150,7 +2423,7 @@ const STEP_FORMS = {
   2: { criteria: '关联测试方案链接 + 关联测试用例（均必填）', fields: [
     { key: 'test_plan_url', label: '测试方案链接', type: 'url', full: true, required: true },
   ], requireCases: true },
-  3: { criteria: '上传版本配套表（附件必传，未上传不可进入下一环节）', attachments: 'version_config', attachmentLabel: '版本配套表', requireAttachment: true },
+  3: { criteria: '逐项核对版本配套表，全部适用项勾选后才能进入下一环节', versionCheck: true, attachments: 'version_config', attachmentLabel: '参考附件（选填）' },
   4: { criteria: '测试环境CPU、内存、IP + 环境自检报告附件（附件必传）', attachments: 'env_check', attachmentLabel: '环境自检报告', requireAttachment: true, fields: [
     { key: 'cpu', label: 'CPU', full: true },
     { key: 'memory', label: '内存' }, { key: 'ip', label: '测试环境IP' },
@@ -2170,10 +2443,36 @@ const STEP_FORMS = {
 // 与后端 CASCADE_FIELD 家族同源：环节 → 任务级角色字段 → 项目角色(project_role)。
 // 3/4/6/8→版本负责人；7→测试执行；5(环境审核)→仅PL——"环境审核只有PL有权限"由此落地。
 const STEP_FAMILY_ROLES = {
+  2: ['tse'],
   3: ['version_owner'], 4: ['version_owner'], 5: ['pl'],
   6: ['version_owner'], 7: ['executor'], 8: ['version_owner']
 };
 const STEP_ROLE_ZH = { version_owner: '版本负责人', pl: 'PL', tse: 'TSE', executor: '测试执行' };
+// 环节没指定负责人（建任务时对应角色留空）时，按"该环节对应的角色"兜底，
+// 与后端 app/core/step_perms.py 的 STEP_ROLE_FALLBACK 一一对应，改一处必须改两处。
+const STEP_ROLE_FALLBACK = {
+  1: ['pl'], 2: ['tse'], 3: ['version_owner'], 4: ['version_owner'],
+  5: ['pl'], 6: ['version_owner'], 7: ['executor'], 8: ['version_owner'],
+};
+// 环节操作权的**前端唯一口径**，逐条对应后端 app/core/step_perms.py:can_operate_step。
+// 任何地方要判断"我能不能操作这个环节"，都必须调这个函数，不要再各写一份。
+function canOperateStep(s, task) {
+  if (!s || !task || !currentUser) return false;
+  const uid = currentUser.id;
+  const no = parseInt(s.step);
+  if (s.assigned_to !== null && s.assigned_to !== undefined && s.assigned_to === uid) return true;
+  // 环节9：assigned_to 恒为 NULL（PL+TSE 双人共审），只有任务 PL 与 TSE 能操作
+  if (no === 9) return uid === task.owner || uid === task.tse_id;
+  // 环节7：主执行人 + executors 列表都能操作
+  if (no === 7 && (task.executor_id === uid || (task.executors || []).some(e => e.user_id === uid))) return true;
+  // 未指定负责人：PL 兜底，或具备该环节对应角色的人
+  if (s.assigned_to === null || s.assigned_to === undefined) {
+    if (task.owner === uid) return true;
+    const myRoles = new Set([...((currentUser.roles) || []), currentUser.role].filter(Boolean));
+    return (STEP_ROLE_FALLBACK[no] || []).some(r => myRoles.has(r));
+  }
+  return false;
+}
 function projectMembersOf(pid) {
   if (!pid) return Promise.resolve(null);
   const hit = (projectsCache || []).find(p => String(p.id) === String(pid));
@@ -2202,11 +2501,16 @@ function refineStepAssigneeOptions(s, members) {
     const acc = (u && u.account) || m.account;
     opts += `<option value="${m.user_id}" ${Number(m.user_id) === Number(s.assigned_to) ? 'selected' : ''}>${esc(nm)}（${esc(acc)}）</option>`;
   });
-  // 现任负责人兜底：角色其后被收回也不至于"选中项蒸发"
+  // 过滤后一个候选都没有（项目未配成员 / 无该角色成员）→ 维持全量列表。
+  // 与后端改派校验的兜底同口径（task_service: 该角色无在编成员时不设卡）；
+  // 否则下拉会塌缩成「只剩现任一人」，停用/离职后根本没法改派。
+  if (!seen.size) return;
+  // 现任负责人兜底：角色被收回、或人员已停用（离职），也不至于"选中项蒸发"
   if (s.assigned_to && !seen.has(Number(s.assigned_to))) {
     const u = byId[s.assigned_to];
-    if (u && u.is_active !== false) {
-      opts = `<option value="${s.assigned_to}" selected>${esc(u.realname || u.account)}（${esc(u.account)}）</option>` + opts;
+    if (u) {
+      const offTag = u.is_active === false ? ' · 已停用' : '';
+      opts = `<option value="${s.assigned_to}" selected>${esc(u.realname || u.account)}（${esc(u.account)}）${offTag}</option>` + opts;
     }
   }
   if (opts) sel.innerHTML = opts;
@@ -2217,6 +2521,8 @@ function renderStepForm(s, taskId, isCurrent, canOperate) {
   if (!cfg) return '';
   const data = s.ext_data || {};
   const isDone = s.status === 'completed' || s.status === 'done';
+  // 未点「开始」不允许提交完成：实际开始时间是耗时统计的唯一来源
+  const started = !!s.begin_date;
   // 环节1只读展示任务基本信息
   if (cfg.readonly) {
     if (!currentTask) return '';
@@ -2229,14 +2535,20 @@ function renderStepForm(s, taskId, isCurrent, canOperate) {
     </div>`;
   }
   let html = `<div class="step-criteria">📋 准出条件：${cfg.criteria}</div>`;
-  // 负责人栏（环节3-8，2026-09-22 需求）：PL/管理员可就地改派；
+  // 负责人栏（环节2-8，2026-09-22 需求；2026-11-26 纳入环节2=TSE 改派）：PL/管理员可就地改派；
   // 服务端以 task_steps.assigned_to 为单一事实源+操作历史留痕，改派成功即整页重取全量同步
-  if (s.step >= 3 && s.step <= 8) {
+  if (s.step >= 2 && s.step <= 8) {
     const anTxt = userName(s.assigned_to);
     // 资格徽标：该环节仅哪些项目角色可接任（3/4/6/8→版本负责人、7→测试执行、5→PL）
     const roLbls = (STEP_FAMILY_ROLES[s.step] || []).map(r => STEP_ROLE_ZH[r]).join('/');
-    const saOpts = (usersCache || []).filter(u => u.is_active !== false).map(u =>
-      `<option value="${u.id}" ${u.id === s.assigned_to ? 'selected' : ''}>${esc(u.realname || u.account)}（${esc(u.account)}）</option>`
+    // 现任负责人若已停用（离职），仍要出现在下拉里并标注，否则改派时会「凭空无人」
+    const saList = (usersCache || []).filter(u => u.is_active !== false);
+    if (s.assigned_to && !saList.some(u => u.id === s.assigned_to)) {
+      const curU = (usersCache || []).find(u => u.id === s.assigned_to);
+      if (curU) saList.unshift(curU);
+    }
+    const saOpts = saList.map(u =>
+      `<option value="${u.id}" ${u.id === s.assigned_to ? 'selected' : ''}>${esc(u.realname || u.account)}（${esc(u.account)}）${u.is_active === false ? ' · 已停用' : ''}</option>`
     ).join('');
     const isAdminFe = currentUser && ((currentUser.roles || []).concat(currentUser.role ? [currentUser.role] : [])).includes('admin');
     const isPlFe = currentUser && currentTask && (currentTask.owner === currentUser.id || isAdminFe);
@@ -2319,8 +2631,14 @@ function renderStepForm(s, taskId, isCurrent, canOperate) {
       if (isPL || isTSE) {
         html += `<button class="btn btn-sm" style="margin-right:8px" onclick="saveDualReview(${currentTask.id}, ${s.id})">💾 保存审核</button>`;
       }
-      html += `<button class="btn btn-sm btn-primary" onclick="completeStep(${currentTask.id}, ${s.id})">✓ 完成本环节</button>`;
+      html += `<button class="btn btn-sm btn-primary" ${started ? '' : 'disabled title="请先点「▶ 开始本环节」"'} onclick="completeStep(${currentTask.id}, ${s.id})">✓ 完成本环节</button>`;
       html += `</div>`;
+    } else if (!isDone && !isCurrent) {
+      // 环节9 被打回后是非当前环节（流程已退回环节8）：与其他环节同款提示，
+      // 否则只看到两个置灰的下拉框，看不出"现在轮不到这里"（2026-11-26 补齐）
+      html += `<div class="step-actions"><span class="muted" style="font-size:12px;padding:6px 0">⏸ 非当前环节，仅查看</span></div>`;
+    } else if (!isDone && isCurrent && !canOperate) {
+      html += `<div class="step-actions"><span class="muted" style="font-size:12px;padding:6px 0">🔒 该环节由任务 PL 与 TSE 审核，无操作权限</span></div>`;
     }
     return html;
   }
@@ -2372,7 +2690,7 @@ function renderStepForm(s, taskId, isCurrent, canOperate) {
     } else if (isCurrent && canOperate) {
       html += `<div class="step-actions">`;
       if (cfg.fields) html += `<button class="btn btn-sm" onclick="saveStepData(${taskId}, ${s.id})">💾 保存数据</button>`;
-      html += `<button class="btn btn-sm btn-primary" onclick="completeStep(${taskId}, ${s.id})">✓ 完成本环节</button>`;
+      html += `<button class="btn btn-sm btn-primary" ${started ? '' : 'disabled title="请先点「▶ 开始本环节」"'} onclick="completeStep(${taskId}, ${s.id})">✓ 完成本环节</button>`;
       html += `</div>`;
     } else if (!isCurrent) {
       html += `<div class="step-actions"><span class="muted" style="font-size:12px;padding:6px 0">⏸ 非当前环节，仅查看</span></div>`;
@@ -2438,6 +2756,11 @@ async function saveStepData(taskId, stepId) {
 async function completeStep(taskId, stepId, extraNote) {
   const step = stepCache.find(s => s.id === stepId);
   if (!step) return;
+  // 0. 必须先点「开始本环节」：实际开始时间是耗时统计的唯一来源，不允许跳过
+  if (!step.begin_date) {
+    toast('请先点「▶ 开始本环节」记录实际开始时间，再提交完成', true);
+    return;
+  }
   let extData = collectStepData(stepId, step.step);
   // 「处理方式→提交到下一环节」的可选说明，随环节完成归档到本环节 ext_data
   if (typeof extraNote === 'string' && extraNote.trim()) extData['handle_note'] = extraNote.trim();
@@ -2460,6 +2783,20 @@ async function completeStep(taskId, stepId, extraNote) {
       toast('请先关联测试用例再完成本环节', true);
       return;
     }
+  }
+  // 2.1 第三阶段：版本配套表必须全部适用项已勾选
+  if (step.step === 3) {
+    try {
+      const vc = await api(`/api/tasks/${taskId}/version-config`);
+      if (!vc.initialized) {
+        toast((vc.available_configs || []).length ? '请先选择版本配套表' : '本任务所属产品还没有版本配套表，请先在「产品与项目 → 版本配套表」创建', true);
+        return;
+      }
+      if ((vc.summary && vc.summary.pending) > 0) {
+        toast(`版本配套表还有 ${vc.summary.pending} 项未核对，请全部勾选后再完成本环节`, true);
+        return;
+      }
+    } catch (e) { toast('版本配套表校验失败：' + e.message, true); return; }
   }
   // 3. 校验必传附件（requireAttachment: true，步骤3 版本配套 / 步骤4 环境自检）
   if (cfg && cfg.requireAttachment) {
@@ -2569,7 +2906,7 @@ async function hdSubmit(taskId, stepId, stepNo) {
   } catch (e) { toast(e.message, true); }
 }
 
-// PL改派非PL环节(3-8)责任人——服务端同步策略见 task_service.change_step_assignee;
+// PL改派环节2-8责任人——服务端同步策略见 task_service.change_step_assignee;
 // 成功后整页重取(与回退同款)，环节头/banner/待我处理判定/操作历史一并达到新的一致态
 async function reassignStep(taskId, stepId, stepNo) {
   const sel = document.getElementById(`sa_sel_${stepId}`);
@@ -3073,6 +3410,551 @@ async function linkSuiteToTask(suiteId, suiteName) {
   } catch (e) { toast(e.message, true); }
 }
 
+// ============ 版本配套表管理 ============
+let vcConfigsCache = [];
+let currentVcId = null;
+let currentVcDetail = null;
+let taskVcCache = null;
+let taskVcNoteItemId = null;
+let taskVcNoteStepId = null;
+
+async function loadVersionConfigs() {
+  const wrap = document.getElementById('vcListWrap');
+  if (!wrap) return;
+  wrap.innerHTML = '<div class="empty" style="padding:20px 0">加载中…</div>';
+  try {
+    vcConfigsCache = await api('/api/version-configs');
+  } catch (e) {
+    wrap.innerHTML = `<div class="empty" style="color:var(--danger);padding:20px 0">加载失败：${esc(e.message)}</div>`;
+    return;
+  }
+  renderVersionConfigList();
+}
+
+// 当前产品可见的配套表：严格按产品归属，不跨产品
+function vcConfigsForCurrentProduct() {
+  const all = vcConfigsCache || [];
+  if (!ppSelectedProductId) return [];
+  return all.filter(c => c.product_id === ppSelectedProductId);
+}
+
+function renderVersionConfigList() {
+  const wrap = document.getElementById('vcListWrap');
+  if (!wrap) return;
+  const product = (zentaoProductsCache || []).find(p => p.id === ppSelectedProductId);
+  const list = vcConfigsForCurrentProduct();
+  const hint = `<div class="muted" style="font-size:12px;margin-bottom:8px">
+    ${product ? esc(product.name) : '未选择产品'} · ${list.length} 份配套表
+    <span style="margin-left:6px">（配套表按产品区分，只在所属产品的任务里出现）</span>
+  </div>`;
+  if (!list.length) {
+    wrap.innerHTML = hint + `<div class="empty" style="padding:24px 0">
+      ${product ? `「${esc(product.name)}」还没有版本配套表` : '请先在左侧选择产品'}，点击右上角「+ 新建版本配套表」
+    </div>`;
+    return;
+  }
+  wrap.innerHTML = hint + `<table>
+      <thead><tr><th>名称</th><th>条目数</th><th>更新时间</th><th style="width:280px">操作</th></tr></thead>
+      <tbody>${list.map(c => `<tr class="clickable" onclick="openVersionConfig(${c.id})">
+        <td><b>${esc(c.name)}</b>${c.model_key ? `<span class="badge badge-gray" style="margin-left:6px">${esc(c.model_key)}</span>` : ''}
+          ${c.description ? `<div class="muted" style="font-size:11px;margin-top:2px">${esc(c.description)}</div>` : ''}</td>
+        <td>${c.item_count || 0}</td>
+        <td class="muted" style="font-size:12px">${formatDateTime(c.updated_at)}</td>
+        <td onclick="event.stopPropagation()">
+          <button class="btn btn-sm" onclick="openVersionConfig(${c.id})">查看</button>
+          <button class="btn btn-sm" onclick="exportVersionConfig(${c.id})">导出</button>
+          <span class="vc-manage-only"><button class="btn btn-sm" onclick="openVersionConfigEdit(${c.id})">编辑</button></span>
+          <span class="vc-manage-only"><button class="btn btn-sm" style="color:var(--danger)" onclick="deleteVersionConfig(${c.id})">删除</button></span>
+        </td>
+      </tr>`).join('')}</tbody>
+    </table>`;
+}
+
+async function openVersionConfigCreate(copyFromId) {
+  if (!(zentaoProductsCache || []).length) {
+    try { zentaoProductsCache = await api('/api/products'); } catch (e) {}
+  }
+  if (!vcConfigsCache.length) {
+    try { vcConfigsCache = await api('/api/version-configs'); } catch (e) {}
+  }
+  document.getElementById('vcName').value = '';
+  document.getElementById('vcModelKey').value = '';
+  document.getElementById('vcDesc').value = '';
+  document.getElementById('vcProduct').innerHTML = '<option value="">请选择产品</option>' +
+    (zentaoProductsCache || []).map(p => `<option value="${p.id}">${esc(p.name)}</option>`).join('');
+  document.getElementById('vcCopyFrom').innerHTML = '<option value="">不复制，从空白开始</option>' +
+    (vcConfigsCache || []).map(c => `<option value="${c.id}">${esc(c.name)}（${c.item_count || 0} 条 · ${esc(c.product_name || '通用')}）</option>`).join('');
+  // 从「产品与项目」页签新建时，默认挂到左侧选中的产品
+  if (ppSelectedProductId) document.getElementById('vcProduct').value = String(ppSelectedProductId);
+  if (copyFromId) {
+    document.getElementById('vcCopyFrom').value = String(copyFromId);
+    onVcCopyFromChange(true);
+  }
+  document.getElementById('versionConfigModal').classList.add('show');
+}
+
+// 选中「复制自」后：名称留空则自动带出「原名（副本）」，产品/机型沿用来源
+function onVcCopyFromChange(force) {
+  const sel = document.getElementById('vcCopyFrom');
+  const src = (vcConfigsCache || []).find(c => String(c.id) === sel.value);
+  if (!src) return;
+  const nameEl = document.getElementById('vcName');
+  if (force || !nameEl.value.trim()) {
+    const base = src.name.replace(/（副本\d*）$/, '');
+    let cand = `${base}（副本）`;
+    let i = 2;
+    while ((vcConfigsCache || []).some(c => c.name === cand)) { cand = `${base}（副本${i}）`; i++; }
+    nameEl.value = cand;
+  }
+  const prodEl = document.getElementById('vcProduct');
+  if (src.product_id) prodEl.value = String(src.product_id);   // 按产品区分，复制时沿用来源产品
+  if (!document.getElementById('vcModelKey').value.trim() && src.model_key) {
+    document.getElementById('vcModelKey').value = src.model_key;
+  }
+}
+
+async function createVersionConfig() {
+  const name = document.getElementById('vcName').value.trim();
+  if (!name) { toast('请填写版本配套表名称', true); return; }
+  const productId = parseInt(document.getElementById('vcProduct').value) || null;
+  if (!productId) { toast('请选择适用产品：版本配套表按产品区分，不能留空', true); return; }
+  const copyFromId = parseInt(document.getElementById('vcCopyFrom').value) || null;
+  try {
+    const r = await api('/api/version-configs', {
+      method: 'POST',
+      body: {
+        name,
+        product_id: productId,
+        model_key: document.getElementById('vcModelKey').value.trim() || null,
+        description: document.getElementById('vcDesc').value.trim() || null,
+        copy_from_id: copyFromId,
+        items: [],
+      },
+    });
+    closeModal('versionConfigModal');
+    toast(copyFromId ? `已复制生成「${r.name}」，共 ${r.item_count} 条` : '版本配套表已创建');
+    await loadVersionConfigs();
+    await openVersionConfig(r.id);
+  } catch (e) { toast(e.message, true); }
+}
+
+// 配套表详情：展开成整行（临时收起左侧产品列表），返回列表时还原
+function setVcDetailMode(on) {
+  const col = document.getElementById('ppProductCol');
+  if (col) col.style.display = on ? 'none' : '';
+  const dv = document.getElementById('vcDetailView');
+  const lv = document.getElementById('vcListView');
+  if (dv) dv.style.display = on ? '' : 'none';
+  if (lv) lv.style.display = on ? 'none' : '';
+}
+
+async function openVersionConfig(id) {
+  try {
+    currentVcDetail = await api(`/api/version-configs/${id}`);
+    currentVcId = id;
+    setVcDetailMode(true);
+    document.getElementById('vcDetailTitle').textContent = currentVcDetail.name;
+    document.getElementById('vcDetailDesc').textContent = vcDetailDescText(currentVcDetail);
+    renderVersionConfigDetail();
+  } catch (e) { toast(e.message, true); }
+}
+
+function renderVersionConfigDetail() {
+  const wrap = document.getElementById('vcDetailWrap');
+  if (!wrap || !currentVcDetail) return;
+  const items = currentVcDetail.items || [];
+  const nodeCount = items.filter(i => i.node_type === '计算节点').length;
+  const switchCount = items.filter(i => i.node_type === '交换节点').length;
+  wrap.innerHTML = `<div style="display:flex;gap:10px;margin-bottom:12px">
+    <div class="card" style="flex:1;padding:12px 16px"><div class="muted" style="font-size:11px">条目总数</div><div style="font-size:20px;font-weight:600">${items.length}</div></div>
+    <div class="card" style="flex:1;padding:12px 16px"><div class="muted" style="font-size:11px">计算节点</div><div style="font-size:20px;font-weight:600">${nodeCount}</div></div>
+    <div class="card" style="flex:1;padding:12px 16px"><div class="muted" style="font-size:11px">交换节点</div><div style="font-size:20px;font-weight:600">${switchCount}</div></div>
+  </div>
+  <div class="card">
+    <table>
+      <thead><tr><th style="width:150px">配置大类</th><th>一级分类</th><th>要求版本</th><th style="width:170px">操作</th></tr></thead>
+      <tbody>${items.length ? items.map(it => `<tr>
+        <td><span class="badge badge-gray">${esc(it.node_type)}</span></td>
+        <td><b>${esc(it.item_name)}</b>${it.remark ? `<div class="muted" style="font-size:11px;margin-top:2px">${esc(it.remark)}</div>` : ''}</td>
+        <td><code style="font-size:12px;background:#f8fafc;border:1px solid #eef2f7;border-radius:4px;padding:2px 5px">${esc(it.required_value || '/')}</code></td>
+        <td>
+          <span class="vc-manage-only">
+            <button class="btn btn-sm" onclick="openVersionConfigItemModal(${it.id})">编辑</button>
+            <button class="btn btn-sm" style="color:var(--danger)" onclick="deleteVersionConfigItem(${it.id})">删除</button>
+          </span>
+        </td>
+      </tr>`).join('') : '<tr><td colspan="4" class="empty">暂无条目，点击右上角“添加条目”</td></tr>'}</tbody>
+    </table>
+  </div>`;
+}
+
+function backToVersionConfigList() {
+  currentVcId = null;
+  currentVcDetail = null;
+  setVcDetailMode(false);
+  loadVersionConfigs();
+}
+
+function openVersionConfigItemModal(itemId) {
+  if (!currentVcDetail) return;
+  const item = itemId ? (currentVcDetail.items || []).find(i => i.id === itemId) : null;
+  document.getElementById('vcItemId').value = item ? item.id : '';
+  document.getElementById('vcItemTitle').textContent = item ? '编辑条目' : '添加条目';
+  document.getElementById('vcItemNode').value = item ? (item.node_type || '计算节点') : '计算节点';
+  document.getElementById('vcItemName').value = item ? item.item_name : '';
+  document.getElementById('vcItemVersion').value = item ? (item.required_value || '') : '';
+  document.getElementById('vcItemRemark').value = item ? (item.remark || '') : '';
+  document.getElementById('versionConfigItemModal').classList.add('show');
+}
+
+async function saveVersionConfigItem() {
+  if (!currentVcId || !currentVcDetail) return;
+  const itemId = document.getElementById('vcItemId').value;
+  const name = document.getElementById('vcItemName').value.trim();
+  if (!name) { toast('请填写一级分类', true); return; }
+  const old = itemId ? (currentVcDetail.items || []).find(i => String(i.id) === String(itemId)) : null;
+  const body = {
+    node_type: document.getElementById('vcItemNode').value,
+    group_type: old ? (old.group_type || '未分组') : '未分组',
+    component_model: old ? (old.component_model || null) : null,
+    item_name: name,
+    required_value: document.getElementById('vcItemVersion').value.trim(),
+    remark: document.getElementById('vcItemRemark').value.trim() || null,
+  };
+  try {
+    if (itemId) {
+      await api(`/api/version-configs/${currentVcId}/items/${itemId}`, { method: 'PUT', body });
+    } else {
+      await api(`/api/version-configs/${currentVcId}/items`, { method: 'POST', body });
+    }
+    closeModal('versionConfigItemModal');
+    toast(itemId ? '条目已更新' : '条目已添加');
+    currentVcDetail = await api(`/api/version-configs/${currentVcId}`);
+    document.getElementById('vcDetailDesc').textContent =
+      `${currentVcDetail.product_name || '通用'}${currentVcDetail.model_key ? ' · ' + currentVcDetail.model_key : ''} · 共 ${(currentVcDetail.items || []).length} 条`;
+    renderVersionConfigDetail();
+    loadVersionConfigs();
+  } catch (e) { toast(e.message, true); }
+}
+
+async function deleteVersionConfigItem(itemId) {
+  if (!currentVcId) return;
+  const item = (currentVcDetail.items || []).find(i => i.id === itemId);
+  if (!confirm(`确认删除条目「${item ? item.item_name : itemId}」？`)) return;
+  try {
+    await api(`/api/version-configs/${currentVcId}/items/${itemId}`, { method: 'DELETE' });
+    toast('条目已删除');
+    currentVcDetail = await api(`/api/version-configs/${currentVcId}`);
+    renderVersionConfigDetail();
+    loadVersionConfigs();
+  } catch (e) { toast(e.message, true); }
+}
+
+// 详情页副标题：产品 · 机型标识 · 条目数 · 说明
+function vcDetailDescText(cfg) {
+  if (!cfg) return '—';
+  const parts = [cfg.product_name || '—'];
+  if (cfg.model_key) parts.push(cfg.model_key);
+  parts.push(`共 ${(cfg.items || []).length} 条`);
+  if (cfg.description) parts.push(cfg.description);
+  return parts.join(' · ');
+}
+
+// 编辑版本配套表：名称 / 适用产品 / 机型标识 / 说明（条目与已生成的任务快照都不动）
+async function openVersionConfigEdit(configId) {
+  const cfg = (vcConfigsCache || []).find(c => c.id === configId) ||
+    (currentVcDetail && currentVcDetail.id === configId ? currentVcDetail : null);
+  if (!cfg) { toast('配套表数据不存在，请刷新后重试', true); return; }
+  if (!(zentaoProductsCache || []).length) {
+    try { zentaoProductsCache = await api('/api/products'); } catch (e) {}
+  }
+  document.getElementById('vcEditId').value = configId;
+  document.getElementById('vcEditProduct').innerHTML = '<option value="">请选择产品</option>' +
+    (zentaoProductsCache || []).map(p => `<option value="${p.id}">${esc(p.name)}</option>`).join('');
+  document.getElementById('vcEditName').value = cfg.name || '';
+  document.getElementById('vcEditProduct').value = cfg.product_id ? String(cfg.product_id) : '';
+  document.getElementById('vcEditModelKey').value = cfg.model_key || '';
+  document.getElementById('vcEditDesc').value = cfg.description || '';
+  document.getElementById('vcEditModal').classList.add('show');
+  const inp = document.getElementById('vcEditName');
+  setTimeout(() => { inp.focus(); inp.select(); }, 50);
+}
+
+async function saveVersionConfigEdit() {
+  const id = parseInt(document.getElementById('vcEditId').value);
+  const nameEl = document.getElementById('vcEditName');
+  const name = (nameEl.value || '').trim();
+  const productId = parseInt(document.getElementById('vcEditProduct').value) || null;
+  if (!id) { toast('配套表数据不存在，请刷新后重试', true); return; }
+  if (!name) { toast('请填写版本配套表名称', true); nameEl.focus(); return; }
+  if (!productId) { toast('请选择适用产品：版本配套表按产品区分，不能留空', true); return; }
+  const body = {
+    name,
+    product_id: productId,
+    model_key: document.getElementById('vcEditModelKey').value.trim() || null,
+    description: document.getElementById('vcEditDesc').value.trim() || null,
+  };
+  try {
+    await api(`/api/version-configs/${id}`, { method: 'PUT', body });
+    closeModal('vcEditModal');
+    // 重新拉一次：改了适用产品时列表归属会变，不能只改本地缓存
+    await loadVersionConfigs();
+    if (currentVcDetail && currentVcDetail.id === id) {
+      currentVcDetail = await api(`/api/version-configs/${id}`);
+      document.getElementById('vcDetailTitle').textContent = currentVcDetail.name;
+      document.getElementById('vcDetailDesc').textContent = vcDetailDescText(currentVcDetail);
+      renderVersionConfigDetail();
+    }
+    toast('已保存版本配套表信息');
+  } catch (e) { toast(e.message, true); }
+}
+
+async function deleteVersionConfig(configId) {
+  const cfg = (vcConfigsCache || []).find(c => c.id === configId) ||
+    (currentVcDetail && currentVcDetail.id === configId ? currentVcDetail : null);
+  const name = cfg ? cfg.name : `ID ${configId}`;
+  if (!confirm(`确认删除版本配套表「${name}」及其所有条目？\n已生成的任务快照不受影响。`)) return;
+  try {
+    await api(`/api/version-configs/${configId}`, { method: 'DELETE' });
+    toast('版本配套表已删除');
+    if (currentVcId === configId) {
+      currentVcId = null;
+      currentVcDetail = null;
+      setVcDetailMode(false);
+    }
+    loadVersionConfigs();
+  } catch (e) { toast(e.message, true); }
+}
+
+async function exportVersionConfig(configId) {
+  if (!configId) return;
+  try {
+    toast('正在生成版本配套表…');
+    const resp = await fetch(`${API}/api/version-configs/${configId}/export`, { credentials: 'same-origin' });
+    if (resp.status === 401) { showLogin(); throw new Error('未登录'); }
+    if (!resp.ok) {
+      let msg = '导出失败';
+      try { const j = await resp.json(); msg = j.detail || msg; } catch (_) {}
+      throw new Error(msg);
+    }
+    const blob = await resp.blob();
+    const cd = resp.headers.get('Content-Disposition') || '';
+    const m = cd.match(/filename="?([^";]+)"?/);
+    const fname = m ? m[1] : `version_config_${configId}.xlsx`;
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = fname;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    toast('版本配套表已导出');
+  } catch (e) { toast('导出失败：' + (e.message || e), true); }
+}
+
+// ============ 第三阶段版本配套核对 ============
+function renderTaskVersionSection(s, taskId, isCurrent, canOperate) {
+  return `<div id="taskVcWrap_${s.id}" style="margin-top:14px;border-top:1px dashed var(--border);padding-top:14px">
+    <div class="muted" style="font-size:12px">版本配套表加载中…</div>
+  </div>`;
+}
+
+async function loadTaskVersionConfig(stepId, taskId, canEdit) {
+  const wrap = document.getElementById(`taskVcWrap_${stepId}`);
+  if (!wrap) return;
+  try {
+    const data = await api(`/api/tasks/${taskId}/version-config`);
+    taskVcCache = data;
+    renderTaskVersionConfig(wrap, data, stepId, taskId, canEdit);
+  } catch (e) {
+    wrap.innerHTML = `<div class="empty" style="color:var(--danger)">版本配套表加载失败：${esc(e.message)}</div>`;
+  }
+}
+
+function renderTaskVersionConfig(wrap, data, stepId, taskId, canEdit) {
+  const cands = data.available_configs || [];
+  const candOpts = (cur) => cands.map(c =>
+    `<option value="${c.id}" ${String(c.id) === String(cur) ? 'selected' : ''}>${esc(c.name)}${c.model_key ? ' · ' + esc(c.model_key) : ''}（${c.item_count || 0} 条）</option>`).join('');
+
+  // 未初始化：同产品可能有多份配套表，由负责人挑一份
+  if (!data.initialized) {
+    wrap.innerHTML = `<div class="card" style="padding:16px">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+        <div>
+          <b>版本配套表</b>
+          <div class="muted" style="font-size:12px;margin-top:3px">${cands.length ? '请选择本任务使用的一份（同一产品可以有多份）。' : '本任务所属产品还没有版本配套表，请先在「产品与项目 → 版本配套表」创建。'}</div>
+        </div>
+        ${cands.length && canEdit ? `<div style="display:flex;gap:8px;align-items:center">
+          <select id="taskVcSelect_${stepId}" style="padding:7px 9px;border:1px solid var(--border);border-radius:7px;background:#fff">${candOpts('')}</select>
+          <button class="btn btn-sm btn-primary" onclick="selectTaskVersionConfig(${taskId}, ${stepId})">使用此配套表</button>
+        </div>` : ''}
+      </div>
+    </div>`;
+    return;
+  }
+
+  const s = data.summary || {};
+  const pct = s.applicable ? Math.round((s.checked || 0) * 100 / s.applicable) : 0;
+  const items = data.items || [];
+  const curId = data.config ? data.config.id : '';
+  const nodeOrder = ['计算节点', '交换节点', '其他'];
+  let rows = '';
+  nodeOrder.forEach(node => {
+    const nodeItems = items.filter(i => (i.node_type || '计算节点') === node);
+    if (!nodeItems.length) return;
+    const applicableCnt = nodeItems.filter(i => i.is_applicable && !['', '/', 'N/A', 'n/a', '-'].includes((i.required_value || '').trim())).length;
+    rows += `<tr class="vc-group"><td colspan="4">
+      <span style="color:#312e81;font-weight:600;font-size:12px">${esc(node)}</span>
+      <span class="muted" style="font-weight:400;margin-left:8px;font-size:11px">${nodeItems.length} 项 · 需核对 ${applicableCnt} 项</span>
+      ${canEdit && applicableCnt ? `<span style="float:right;display:inline-flex;gap:6px">
+        <button class="btn btn-sm" style="padding:1px 7px;font-size:11px" onclick="event.stopPropagation();bulkCheckTaskVc(${taskId}, true, '${esc(node)}', ${stepId})">本组全部核对</button>
+        <button class="btn btn-sm" style="padding:1px 7px;font-size:11px" onclick="event.stopPropagation();bulkCheckTaskVc(${taskId}, false, '${esc(node)}', ${stepId})">取消</button>
+      </span>` : ''}
+    </td></tr>`;
+    nodeItems.forEach(it => {
+      const applicable = it.is_applicable && !['', '/', 'N/A', 'n/a', '-'].includes((it.required_value || '').trim());
+      const status = !applicable ? '<span class="badge badge-gray">不适用</span>'
+        : it.is_checked ? '<span class="badge badge-green">已核对</span>' : '<span class="badge badge-gray">待核对</span>';
+      const rowCls = applicable ? (it.is_checked ? 'vc-row vc-row-done' : 'vc-row') : 'vc-row vc-row-na';
+      const rowClick = (applicable && canEdit)
+        ? `onclick="toggleTaskVcItem(${taskId}, ${it.id}, ${it.is_checked ? 'false' : 'true'}, ${stepId})" title="点击${it.is_checked ? '取消核对' : '标记为已核对'}"`
+        : '';
+      const tick = it.is_checked ? '<span class="vc-tick">✓</span>' : '<span class="vc-tick vc-tick-off">○</span>';
+      rows += `<tr class="${rowCls}" ${rowClick}>
+        <td>${tick}<b>${esc(it.item_name)}</b>${it.remark ? `<div class="muted" style="font-size:11px;margin-top:2px;padding-left:22px">${esc(it.remark)}</div>` : ''}</td>
+        <td><code style="font-size:12px;background:#f8fafc;border:1px solid #eef2f7;border-radius:4px;padding:2px 5px">${esc(it.required_value || '/')}</code></td>
+        <td>${canEdit && applicable ? `<button class="btn btn-sm" style="padding:2px 7px;font-size:11px" onclick="event.stopPropagation();openTaskVcNote(${it.id}, ${stepId})">${it.remark ? '已备注' : '备注'}</button>` : (it.remark ? '已备注' : '—')}</td>
+        <td>${status}</td>
+      </tr>`;
+    });
+  });
+
+  wrap.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:10px">
+    <div>
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        <b>版本配套表：${esc(data.config ? data.config.name : '—')}</b>
+        <span class="badge badge-gray">${esc(data.config ? data.config.product_name : '')}</span>
+        ${canEdit && cands.length > 1 ? `<select id="taskVcSelect_${stepId}" style="padding:4px 8px;font-size:12px;border:1px solid var(--border);border-radius:6px;background:#fff">${candOpts(curId)}</select>
+          <button class="btn btn-sm" style="padding:3px 9px;font-size:11px" onclick="switchTaskVersionConfig(${taskId}, ${stepId})">切换</button>` : ''}
+      </div>
+      <div class="muted" style="font-size:11px;margin-top:5px">点击任意行即可标记「已核对」，再点一次取消；不适用项无需核对。</div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <span class="muted" style="font-size:12px">已核对 <b style="color:var(--success)">${s.checked || 0}</b> / ${s.applicable || 0}，不适用 ${s.na || 0}</span>
+      ${canEdit ? `<button class="btn btn-sm" onclick="bulkCheckTaskVc(${taskId}, true, '', ${stepId})">全部核对</button>
+        <button class="btn btn-sm" onclick="bulkCheckTaskVc(${taskId}, false, '', ${stepId})">清空</button>` : ''}
+      <button class="btn btn-sm" onclick="exportTaskVersionConfig(${taskId})">⬇ 导出配套表</button>
+    </div>
+  </div>
+  <div style="height:7px;background:#e2e8f0;border-radius:999px;overflow:hidden;margin-bottom:10px">
+    <div style="width:${pct}%;height:100%;background:var(--success);transition:width .2s"></div>
+  </div>
+  <div class="card" style="overflow:auto">
+    <table style="min-width:620px">
+      <thead><tr><th>配套项</th><th style="width:300px">要求版本</th><th style="width:86px">备注</th><th style="width:86px">状态</th></tr></thead>
+      <tbody>${rows || '<tr><td colspan="4" class="empty">该配套表暂无条目</td></tr>'}</tbody>
+    </table>
+  </div>
+  <div class="muted" style="font-size:11px;margin-top:6px">${s.pending ? `还有 ${s.pending} 项未核对，全部核对后才能提交第三阶段。` : '全部适用项已核对，可以提交第三阶段。'}</div>`;
+}
+
+async function selectTaskVersionConfig(taskId, stepId) {
+  const sel = document.getElementById(`taskVcSelect_${stepId}`);
+  if (!sel || !sel.value) return;
+  try {
+    await api(`/api/tasks/${taskId}/version-config/init`, { method: 'POST', body: { config_id: parseInt(sel.value) } });
+    toast('已生成任务版本配套表');
+    await loadTaskVersionConfig(stepId, taskId, true);
+  } catch (e) { toast(e.message, true); }
+}
+
+async function toggleTaskVcItem(taskId, itemId, checked, stepId) {
+  try {
+    await api(`/api/tasks/${taskId}/version-config/items/${itemId}`, { method: 'PATCH', body: { checked } });
+    await loadTaskVersionConfig(stepId, taskId, true);
+  } catch (e) {
+    toast(e.message, true);
+    await loadTaskVersionConfig(stepId, taskId, true);
+  }
+}
+
+// 切换本任务使用的配套表（同产品可有多份）；已有进度会被清空，先确认
+async function switchTaskVersionConfig(taskId, stepId) {
+  const sel = document.getElementById(`taskVcSelect_${stepId}`);
+  if (!sel || !sel.value) return;
+  const checked = (taskVcCache && taskVcCache.summary && taskVcCache.summary.checked) || 0;
+  if (checked && !confirm(`切换配套表会清空已核对的 ${checked} 项，确定切换？`)) return;
+  try {
+    const r = await api(`/api/tasks/${taskId}/version-config/switch`, { method: 'POST', body: { config_id: parseInt(sel.value) } });
+    toast(r.unchanged ? '当前已是这份配套表' : `已切换为「${r.config_name}」，共 ${r.item_count} 项`);
+    await loadTaskVersionConfig(stepId, taskId, true);
+  } catch (e) { toast(e.message, true); }
+}
+
+// 批量核对：nodeType 为空=全部适用项，否则只处理该配置大类
+async function bulkCheckTaskVc(taskId, checked, nodeType, stepId) {
+  const label = nodeType ? `「${nodeType}」整组` : '全部适用项';
+  if (!checked && !confirm(`确定把${label}标记为未核对？`)) return;
+  try {
+    const r = await api(`/api/tasks/${taskId}/version-config/bulk-check`, {
+      method: 'POST',
+      body: { checked, node_type: nodeType || null },
+    });
+    toast(`${label}已${checked ? '核对' : '取消核对'}（${r.affected} 项）`);
+    await loadTaskVersionConfig(stepId, taskId, true);
+  } catch (e) { toast(e.message, true); }
+}
+
+function openTaskVcNote(itemId, stepId) {
+  const item = taskVcCache && (taskVcCache.items || []).find(i => i.id === itemId);
+  if (!item) return;
+  taskVcNoteItemId = itemId;
+  taskVcNoteStepId = stepId;
+  document.getElementById('taskVcNoteTitle').textContent = `配套项备注 · ${item.item_name}`;
+  document.getElementById('taskVcNoteInput').value = item.remark || '';
+  document.getElementById('taskVcNoteModal').classList.add('show');
+}
+
+async function saveTaskVcNote() {
+  if (!taskVcNoteItemId || !currentTask) return;
+  const item = (taskVcCache.items || []).find(i => i.id === taskVcNoteItemId);
+  if (!item) return;
+  try {
+    await api(`/api/tasks/${currentTask.id}/version-config/items/${taskVcNoteItemId}`, {
+      method: 'PATCH',
+      body: { checked: !!item.is_checked, remark: document.getElementById('taskVcNoteInput').value.trim() },
+    });
+    closeModal('taskVcNoteModal');
+    toast('备注已保存');
+    await loadTaskVersionConfig(taskVcNoteStepId, currentTask.id, true);
+  } catch (e) { toast(e.message, true); }
+}
+
+async function exportTaskVersionConfig(taskId) {
+  try {
+    toast('正在生成版本配套表…');
+    const resp = await fetch(`${API}/api/tasks/${taskId}/version-config/export`, { credentials: 'same-origin' });
+    if (resp.status === 401) { showLogin(); throw new Error('未登录'); }
+    if (!resp.ok) {
+      let msg = '导出失败';
+      try { const j = await resp.json(); msg = j.detail || msg; } catch (_) {}
+      throw new Error(msg);
+    }
+    const blob = await resp.blob();
+    const cd = resp.headers.get('Content-Disposition') || '';
+    const m = cd.match(/filename="?([^";]+)"?/);
+    const fname = m ? m[1] : `version_config_${taskId}.xlsx`;
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = fname;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    toast('版本配套表已导出');
+  } catch (e) { toast('导出失败：' + (e.message || e), true); }
+}
+
 // ============ 用例库管理 ============
 let caselibCache = [];
 let casemodCache = [];
@@ -3257,6 +4139,13 @@ async function reloadModules() {
   if (treeWrap) treeWrap.innerHTML = buildModuleTree(casemodCache);
 }
 
+// 用例增删改后统一走这里：模块树的 (N) 计数来自后端 total_case_count，
+// 只刷列表不刷树，就会出现「模块里已经没用例、树上还挂着 (1)」。
+async function refreshCaseArea(modId) {
+  await reloadModules();
+  loadCasesByModule(modId === undefined || modId === null ? (caseCurModId || 0) : modId);
+}
+
 async function addTopModule() {
   const name = prompt('新增顶层模块，请输入名称：');
   if (!name || !name.trim()) return;
@@ -3360,10 +4249,6 @@ async function loadCasesByModule(modId) {
 function renderCaseTable() {
   const wrap = document.getElementById('caseListWrap');
   const cases = currentCaseList;
-  if (!cases.length) {
-    wrap.innerHTML = '<div class="empty">该模块下暂无用例</div>';
-    return;
-  }
   const modMap = {}; casemodCache.forEach(m => modMap[m.id] = m.name);
   const allChecked = cases.length > 0 && cases.every(c => caseCheckedSet.has(c.id));
   // 批量操作工具栏
@@ -3376,12 +4261,20 @@ function renderCaseTable() {
       <button class="btn btn-sm" onclick="openCopyModal()">复制到…</button>
       <button class="btn btn-sm" style="margin-left:auto" onclick="clearCaseSelection()">取消选择</button>
     </div>` : '';
-  wrap.innerHTML = `
-    ${batchBar}
-    <div style="display:flex;justify-content:space-between;margin-bottom:8px">
+  // 工具条（条数 + 新增用例）与用例条数无关，空模块也必须保留，否则删完最后一条就没入口再加
+  const toolbar = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
       <b>${cases.length} 条用例</b>
       <button class="btn btn-sm btn-primary" onclick="openCaseEdit(null)">+ 新增用例</button>
-    </div>
+    </div>`;
+  if (!cases.length) {
+    wrap.innerHTML = batchBar + toolbar +
+      '<div class="empty" style="padding:24px">该模块下暂无用例，可点右上角「+ 新增用例」添加</div>';
+    return;
+  }
+  wrap.innerHTML = `
+    ${batchBar}
+    ${toolbar}
     <table><thead><tr>
       <th style="width:36px"><input type="checkbox" ${allChecked ? 'checked' : ''} onchange="toggleAllCases(this.checked)"></th>
       <th>用例标题</th>
@@ -3431,10 +4324,10 @@ function openCaseDetail(caseId) {
   if (!c) return;
   const modMap = {}; casemodCache.forEach(m => modMap[m.id] = m.name);
   const stepsHtml = (c.steps && c.steps.length)
-    ? c.steps.map((s, i) => `<div style="padding:8px;border:1px solid var(--border);border-radius:6px;margin-bottom:6px">
-        <div style="font-weight:600;font-size:12px;margin-bottom:4px">步骤 ${i+1}</div>
-        <div style="font-size:13px"><b>操作：</b>${esc(s.desc || '')}</div>
-        <div style="font-size:13px;margin-top:4px"><b>预期：</b>${esc(s.expect || '')}</div>
+    ? c.steps.map((s, i) => `<div class="step-card" style="padding:8px;border:1px solid var(--border);border-top:1px solid var(--border);border-radius:6px;margin-bottom:6px">
+        <div style="font-weight:600;font-size:12px">步骤 ${i+1}</div>
+        ${stepTextBlock('操作', s.desc, `${caseId}:${i}:desc`, stepTextExpanded)}
+        ${stepTextBlock('预期', s.expect, `${caseId}:${i}:expect`, stepTextExpanded)}
       </div>`).join('')
     : '<span class="muted">无步骤</span>';
   const modal = document.getElementById('caseDetailModal');
@@ -3465,7 +4358,7 @@ async function batchDeleteCases() {
     await api('/api/cases/cases/batch-delete', { method: 'POST', body: { case_ids: ids } });
     toast(`已删除 ${ids.length} 条用例`);
     caseCheckedSet = new Set();
-    loadCasesByModule(0);
+    refreshCaseArea(caseCurModId || 0);
   } catch (e) { toast(e.message, true); }
 }
 
@@ -3581,6 +4474,10 @@ function openCaseEdit(caseId) {
   document.getElementById('ceAuto').value = 'no';
   document.getElementById('ceModule').innerHTML = '<option value="">— 未分类 —</option>' +
     buildHierModuleOpts(casemodCache);
+  // 在某个模块里点「新增用例」→ 默认落到当前模块，不用再手选一次
+  if (!caseId && caseCurModId > 0) {
+    document.getElementById('ceModule').value = String(caseCurModId);
+  }
   document.getElementById('ceSteps').innerHTML = '';
   addCaseStep();
   if (caseId) {
@@ -3611,10 +4508,10 @@ function addCaseStep(desc = '', expect = '') {
   const idx = wrap.children.length;
   const row = document.createElement('div');
   row.className = 'form-row';
-  row.style.cssText = 'align-items:center;gap:6px;margin-bottom:4px';
+  row.style.cssText = 'grid-template-columns:minmax(0,1fr) minmax(0,1fr) 28px;align-items:start;gap:8px;margin-bottom:8px';
   row.innerHTML = `
-    <input class="ce-step-desc" placeholder="步骤${idx+1}" value="${esc(desc)}" style="flex:1">
-    <input class="ce-step-expect" placeholder="预期结果" value="${esc(expect)}" style="flex:1">
+    <textarea class="ce-step-desc" rows="2" wrap="soft" placeholder="步骤${idx+1}" style="min-height:64px;resize:vertical;line-height:1.5">${esc(desc)}</textarea>
+    <textarea class="ce-step-expect" rows="2" wrap="soft" placeholder="预期结果" style="min-height:64px;resize:vertical;line-height:1.5">${esc(expect)}</textarea>
     <button type="button" class="btn btn-sm" style="color:var(--danger);padding:2px 6px" onclick="this.parentElement.remove()">×</button>
   `;
   wrap.appendChild(row);
@@ -3645,9 +4542,9 @@ async function saveCase() {
     }
     toast('用例已保存');
     closeModal('caseEditModal');
-    // 刷新当前列表
+    // 刷新当前列表 + 模块树计数（新增/改模块都会影响 (N)）
     const modSelect = document.getElementById('ceModule');
-    loadCasesByModule(parseInt(modSelect.value) || 0);
+    refreshCaseArea(parseInt(modSelect.value) || 0);
   } catch (e) { toast(e.message, true); }
 }
 
@@ -3656,7 +4553,7 @@ async function deleteCase(caseId) {
   try {
     const r = await api(`/api/cases/cases/${caseId}`, { method: 'DELETE' });
     toast(r && r.unlinked ? `已删除（同时移除 ${r.unlinked} 个任务中的用例关联）` : '已删除');
-    loadCasesByModule(0);
+    refreshCaseArea(caseCurModId || 0);
   } catch (e) { toast(e.message, true); }
 }
 
@@ -3839,7 +4736,7 @@ async function loadCaseAssignments(stepId, taskId, canEdit) {
         if (roles.includes('executor')) executorIds.add(u.id);
       });
     }
-    const executorUsers = (usersCache || []).filter(u => executorIds.has(u.id));
+    const executorUsers = (usersCache || []).filter(u => executorIds.has(u.id) && u.is_active !== false);
     // 填充顶部批量执行人下拉
     const batchSel = document.getElementById(`caseAssignBatchUser_${stepId}`);
     if (batchSel) {
@@ -3850,8 +4747,14 @@ async function loadCaseAssignments(stepId, taskId, canEdit) {
 
     const renderAssignRow = (c) => {
       const assignedUid = assignments[String(c.id)] || assignments[c.id] || '';
+      // 已分配给离职人员时仍要能看见原值，避免显示成「未分配」误导
+      const rowUsers = executorUsers.slice();
+      if (assignedUid && !rowUsers.some(u => String(u.id) === String(assignedUid))) {
+        const cu = (usersCache || []).find(u => String(u.id) === String(assignedUid));
+        if (cu) rowUsers.push(cu);
+      }
       const opts = ['<option value="">— 未分配 —</option>']
-        .concat(executorUsers.map(u => `<option value="${u.id}" ${String(assignedUid) === String(u.id) ? 'selected' : ''}>${esc(u.realname || u.account)}</option>`))
+        .concat(rowUsers.map(u => `<option value="${u.id}" ${String(assignedUid) === String(u.id) ? 'selected' : ''}>${esc(u.realname || u.account)}${u.is_active === false ? ' · 已停用' : ''}</option>`))
         .join('');
       const typeBadge = { feature: '功能', performance: '性能', integration: '集成', regression: '回归' }[c.type] || c.type || '—';
       const priLabel = c.priority ? `P${c.priority}` : '—';
@@ -4001,11 +4904,34 @@ async function exportTestTracking(taskId) {
   }
 }
 
+// 用例整体状态的唯一显示口径：pass/fail/block/na/partial（部分执行）。
+// 「部分执行」= 有步骤已标、有步骤未测、无失败/阻塞：进度先存下来，下次打开接着测，不算通过（2026-11-26 用户定夺）。
+const CASE_STATUS_ZH = {pass:'通过', fail:'失败', block:'阻塞', na:'不支持', partial:'部分执行'};
+function caseStatusBadge(status, extraStyle, note) {
+  const cls = status === 'pass' ? 'badge-green' : status === 'fail' ? 'badge-red'
+    : status === 'block' ? 'badge-amber' : status === 'partial' ? 'badge-blue' : 'badge-gray';
+  return `<span class="badge ${cls}"${extraStyle ? ` style="${extraStyle}"` : ''}>${CASE_STATUS_ZH[status] || esc(status)}${note ? `（${note}）` : ''}</span>`;
+}
+// 读取口径（与后端 api/cases.py::effective_case_status 一致）：历史上「通过但步骤明细没覆盖全部步骤」的旧结果按 partial 显示，不改库。
+// 完全没有步骤明细的早期「通过」无法判断测没测完，保持原样。返回 null 表示待执行。
+function effectiveCaseStatus(c) {
+  const lr = c && c.latest_result;
+  if (!lr) return null;
+  const steps = Array.isArray(c.steps) ? c.steps : [];
+  const sr = Array.isArray(lr.step_results) ? lr.step_results : [];
+  if (lr.status === 'pass' && steps.length && sr.length) {
+    return steps.some((_, i) => !sr.some(r => r && r.step_idx === i)) ? 'partial' : 'pass';
+  }
+  return lr.status;
+}
+function caseRowStatusBadge(c, extraStyle) {
+  const status = effectiveCaseStatus(c);
+  return status ? caseStatusBadge(status, extraStyle) : `<span class="badge badge-gray"${extraStyle ? ` style="${extraStyle}"` : ''}>待执行</span>`;
+}
+
 // 步骤2「关联用例」单行：序号 + 标题 + 状态 + 取消关联
 function step2CaseRow(c, seq, canEdit, taskId) {
-  const statusBadge = c.latest_result
-    ? `<span class="badge ${c.latest_result.status === 'pass' ? 'badge-green' : c.latest_result.status === 'fail' ? 'badge-red' : 'badge-amber'}" style="margin-left:6px">${{pass:'通过',fail:'失败',block:'阻塞',na:'不支持'}[c.latest_result.status]}</span>`
-    : '<span class="badge badge-gray" style="margin-left:6px">待执行</span>';
+  const statusBadge = caseRowStatusBadge(c, 'margin-left:6px');
   const delBtn = canEdit ? ` <button class="btn btn-sm" style="padding:1px 6px;font-size:11px;color:var(--danger)" onclick="unlinkCase(${taskId}, ${c.id}, '${esc(c.title).replace(/'/g,"")}')">取消关联</button>` : '';
   return `<div style="display:flex;align-items:center;padding:6px 16px;border-bottom:1px solid var(--border);background:#fff">
     <span style="width:34px;flex-shrink:0;color:var(--muted);font-size:12px">${seq}</span>
@@ -4022,11 +4948,11 @@ function step7CaseRow(c, assignments, canEdit, taskId, stepId) {
   const execUid = c.latest_result?.executor_id;
   const execName = execUid ? esc(userName(execUid)) : '—';
   const execTime = c.latest_result?.executed_at ? formatDateTime(c.latest_result.executed_at) : '—';
-  const status = c.latest_result?.status;
-  const statusBadge = status
-    ? `<span class="badge ${status === 'pass' ? 'badge-green' : status === 'fail' ? 'badge-red' : 'badge-amber'}" style="font-size:11px">${{pass:'通过',fail:'失败',block:'阻塞',na:'不支持'}[status]}</span>`
-    : '<span class="badge badge-gray" style="font-size:11px">待执行</span>';
-  const opLabel = canEdit ? '▶ 执行' : '👁 查看';
+  const statusBadge = caseRowStatusBadge(c, 'font-size:11px');
+  // 操作按钮：用例已指派给别人的 → 只有被指派人显示「执行」，其余人一律「查看」（与 openCaseExecModal 同口径）
+  const mine = canEdit && (!assignedUid || parseInt(assignedUid) === currentUser.id);
+  const opLabel = mine ? '▶ 执行' : '👁 查看';
+  const opTitle = (canEdit && assignedUid && !mine) ? ' title="该用例已分配给他人，仅被分配人可执行"' : '';
   const pri = parseInt(c.priority) || 3;
   const priClass = p => p === 1 ? 'badge-red' : p === 2 ? 'badge-amber' : 'badge-blue';
   return `<div style="display:flex;align-items:center;gap:8px;padding:6px 16px;border-bottom:1px solid var(--border);font-size:13px;background:#fff">
@@ -4041,39 +4967,48 @@ function step7CaseRow(c, assignments, canEdit, taskId, stepId) {
     <span style="width:120px;flex-shrink:0;font-size:12px;color:var(--muted)">${execTime}</span>
     <span style="width:64px;text-align:center;flex-shrink:0">${statusBadge}</span>
     <span style="width:80px;text-align:center;flex-shrink:0">
-      <button class="btn btn-sm" style="padding:2px 8px;font-size:11px;white-space:nowrap" onclick="openCaseExecModal(${taskId}, ${c.id}, ${stepId}, ${canEdit ? 'true' : 'false'})">${opLabel}</button>
+      <button class="btn btn-sm" style="padding:2px 8px;font-size:11px;white-space:nowrap"${opTitle} onclick="openCaseExecModal(${taskId}, ${c.id}, ${stepId}, ${canEdit ? 'true' : 'false'})">${opLabel}</button>
     </span>
   </div>`;
 }
 
 async function loadLinkedCases(taskId, stepId) {
   const isStep7 = stepCache.find(s => s.id === stepId)?.step === 7;
+  const list = document.getElementById(`linkedCasesList_${stepId}`);
+  const statsEl0 = document.getElementById(`caseStats_${stepId}`);
+  // 加载失败必须显示原因 + 重试：原来 catch(e){} 静默吞错，接口一报错页面就永远停在「加载中」
+  const showFail = (e) => {
+    console.error('[loadLinkedCases]', taskId, stepId, e);
+    if (list) {
+      list.innerHTML = `<div style="padding:12px 16px;color:var(--danger);font-size:13px">
+        用例加载失败：${esc((e && e.message) || e)}
+        <button class="btn btn-sm" style="margin-left:8px" onclick="loadLinkedCases(${taskId}, ${stepId})">重试</button>
+      </div>`;
+    }
+    if (statsEl0) statsEl0.textContent = '统计加载失败';
+  };
+  let cases;
   try {
-    linkedCasesCache = await api(`/api/tasks/${taskId}/cases`);
-    const list = document.getElementById(`linkedCasesList_${stepId}`);
+    cases = await api(`/api/tasks/${taskId}/cases`);
+  } catch (e) { showFail(e); return; }
+  linkedCasesCache = Array.isArray(cases) ? cases : [];
+  try {
     if (!list) return;
     if (!linkedCasesCache.length) {
       list.innerHTML = '<span class="muted" style="font-size:13px">暂未关联测试用例</span>';
       return;
     }
     // 更新统计（仅 step7）
-    const statsEl = document.getElementById(`caseStats_${stepId}`);
-    if (statsEl && isStep7) {
+    if (statsEl0 && isStep7) {
       try {
         const stats = await api(`/api/tasks/${taskId}/cases/stats`);
-        statsEl.textContent = `共${stats.total}条 | 通过${stats.passed} 失败${stats.failed} 阻塞${stats.blocked} 待执行${stats.pending} | 通过率${stats.pass_rate}%`;
-      } catch (e) {}
+        statsEl0.textContent = `共${stats.total}条 | 通过${stats.passed} 失败${stats.failed} 阻塞${stats.blocked} 部分执行${stats.partial || 0} 待执行${stats.pending} | 通过率${stats.pass_rate}%`;
+      } catch (e) { statsEl0.textContent = '统计加载失败'; }
     }
-    // 执行测试环节(step 7)：任务 executor_id + 其他 executors + assigned_to 都能操作
+    // 关联/解除用例按钮的可见性，统一走 canOperateStep()（后端 cases.py 用 assert_can_operate 校验）
     const stepObj = stepCache.find(s => s.id === stepId);
     const isCurrent = currentTask && parseInt(stepObj?.step) === parseInt(currentTask.current_step);
-    const isAssignee = stepObj?.assigned_to === currentUser.id;
-    const isAllHands = stepObj?.assigned_to === null;
-    const isTaskExecutor = stepObj?.step === 7 && currentTask && (
-      currentTask.executor_id === currentUser.id ||
-      (currentTask.executors || []).some(e => e.user_id === currentUser.id)
-    );
-    const canEdit = isCurrent && (isAssignee || isAllHands || isTaskExecutor);
+    const canEdit = isCurrent && canOperateStep(stepObj, currentTask);
 
     if (isStep7) {
       // 步骤7：表头 + 按模块层级分组展示，点击模块可展开/折叠
@@ -4095,11 +5030,15 @@ async function loadLinkedCases(taskId, stepId) {
       // 步骤2：按模块层级展示关联用例，支持展开/折叠，可取消关联
       list.innerHTML = renderCaseModuleTreeHtml(linkedCasesCache, (c, seq) => step2CaseRow(c, seq, canEdit, taskId));
     }
-  } catch (e) {}
+  } catch (e) {
+    // 数据异常（缺字段等）导致渲染抛错时，也要把原因显示出来，不能停在「加载中」
+    showFail(e);
+  }
 }
 
 // ============ 用例执行弹窗（步骤7） ============
-let caseExecCtx = null; // { taskId, linkId, stepId, canEdit, caseData }
+let caseExecCtx = null; // { taskId, linkId, stepId, canEdit, caseData, expanded: Set }
+let stepTextExpanded = new Set(); // 用例详情弹窗的步骤文本展开状态（key: "<caseId>:<stepIdx>:<desc|expect>"）
 
 let execManageCtx = null;
 
@@ -4120,7 +5059,7 @@ function renderExecManage() {
   if (execManageCtx.added) execManageCtx.added.forEach(uid => { if (!removed.has(uid)) executorIds.add(uid); });
   // 可选执行人：有 executor 角色的用户
   const executorUsers = (usersCache || []).filter(u =>
-    (u.roles || []).includes('executor') && !executorIds.has(u.id)
+    (u.roles || []).includes('executor') && u.is_active !== false && !executorIds.has(u.id)
   );
   const step6 = stepCache.find(s => s.step === 6);
   const assignments = (step6?.ext_data?.case_assignments) || {};
@@ -4233,8 +5172,7 @@ async function saveExecManage() {
 function openCaseExecModal(taskId, linkId, stepId, canEdit) {
   const c = linkedCasesCache.find(x => x.id === linkId);
   if (!c) { toast('用例数据不存在，请刷新页面重试', true); return; }
-  // 权限校验：步骤7执行测试，任务的测试执行人（主执行人 + executors 列表）可对任一用例执行；
-  // 逐条用例指派(步骤6)降级为"负责人"标识，不再作为硬性编辑门槛（避免执行人被自己的任务锁死）
+  // 逐条用例指派是硬门槛（仅被指派人可执行，2026-11-26 用户定夺），判断见下方 finalCanEdit
   const step6 = stepCache.find(s => s.step === 6);
   const assignments = (step6?.ext_data?.case_assignments) || {};
   const assignedUid = assignments[String(c.id)] || assignments[c.id];
@@ -4243,12 +5181,17 @@ function openCaseExecModal(taskId, linkId, stepId, canEdit) {
     currentTask.executor_id === currentUser.id ||
     (currentTask.executors || []).some(e => e.user_id === currentUser.id)
   );
-  const finalCanEdit = canEdit && (isAssignedToMe || isStep7Executor);
+  // 逐条指派是硬门槛（2026-11-26 用户定夺）：
+  //   · 用例已指派 → 只有被指派人可以执行（主执行人、其他执行人都只能查看）
+  //   · 用例未指派 → 任务的测试执行人（主执行人 + executors）都可以执行
+  // 此前把指派降级成"负责人标识"，任何执行人都能替别人执行（预发任务133 实测：
+  // 分配给李东坡的用例被主执行人点了通过）。后端 cases.py record_result 同口径硬校验，这里只是不显示按钮。
+  const finalCanEdit = !!(canEdit && isStep7Executor && (!assignedUid || isAssignedToMe));
   // pendingResults: 本次弹窗内的临时编辑结果，确认时才提交；关闭/取消则丢弃
   const initialResults = (c.latest_result && Array.isArray(c.latest_result.step_results))
     ? JSON.parse(JSON.stringify(c.latest_result.step_results))
     : [];
-  caseExecCtx = { taskId, linkId, stepId, canEdit: finalCanEdit, caseData: c, isAssignedToMe, assignedUid, pendingResults: initialResults };
+  caseExecCtx = { taskId, linkId, stepId, canEdit: finalCanEdit, caseData: c, isAssignedToMe, assignedUid, pendingResults: initialResults, edited: false, expanded: new Set() };
   document.getElementById('caseExecTitle').textContent = `用例执行：${c.title || '#' + c.zentao_case_id}`;
   renderCaseExecBody();
   document.getElementById('caseExecModal').classList.add('show');
@@ -4257,21 +5200,32 @@ function openCaseExecModal(taskId, linkId, stepId, canEdit) {
 function renderCaseExecBody() {
   const { taskId, linkId, stepId, canEdit, caseData: c, isAssignedToMe, assignedUid, pendingResults } = caseExecCtx;
   const body = document.getElementById('caseExecBody');
-  // 先从 pending 计算整体状态；pending 为空时回退到已有结果
-  const hasPending = pendingResults && pendingResults.length;
-  const overallStatus = hasPending
-    ? deriveOverallStatus(pendingResults)
-    : (c.latest_result?.status || null);
+  // edited：本次弹窗内是否动过步骤结果。动过就以弹窗内为准——哪怕全被标回「未执行」(pending 为空)，
+  // 也要显示「待执行」；没动过才回退显示已保存的结果（否则清空后顶部仍挂着上一次的「通过」，自相矛盾）
+  const edited = !!caseExecCtx.edited;
+  const pending = (pendingResults || []);
+  const steps = Array.isArray(c.steps) ? c.steps : [];
+  const activeStepResults = edited ? pending : (c.latest_result?.step_results || []);
+  // 未测步骤：用例判「通过」的前提是所有步骤都已标记（2026-11-26 用户反馈：6 步只测了 5 步，用例却显示通过）；
+  // 没测完的保存为「部分执行」，进度留着下次接着测。历史旧数据按 effectiveCaseStatus 换算成 partial。
+  const unmarkedIdx = steps.map((_, i) => i).filter(i => !activeStepResults.some(r => r && r.step_idx === i));
+  const overallStatus = edited
+    ? deriveOverallStatus(pending, steps.length)
+    : effectiveCaseStatus(c);
   const overallBadge = overallStatus
-    ? `<span class="badge ${overallStatus === 'pass' ? 'badge-green' : overallStatus === 'fail' ? 'badge-red' : 'badge-amber'}">${{pass:'通过',fail:'失败',block:'阻塞',na:'不支持'}[overallStatus]}</span>`
+    ? caseStatusBadge(overallStatus, '', overallStatus === 'partial' && unmarkedIdx.length ? `${unmarkedIdx.length} 步未测` : '')
     : '<span class="badge badge-gray">待执行</span>';
-  // 优先使用 pending 结果；pending 为空时回退到已有结果
-  const activeStepResults = hasPending ? pendingResults : (c.latest_result?.step_results || []);
   const stepResMap = {};
   activeStepResults.forEach(s => { stepResMap[s.step_idx] = s; });
-  const steps = Array.isArray(c.steps) ? c.steps : [];
   const assignedName = assignedUid ? userName(parseInt(assignedUid)) : '未分配';
   const canSubmitBug = canEdit && (overallStatus === 'fail' || overallStatus === 'block');
+  // 只读提示：说清楚"为什么不能动"——分给别人了 / 自己不是执行人
+  const assignedToOther = !!assignedUid && !isAssignedToMe;
+  const lockTip = !canEdit
+    ? (assignedToOther
+        ? `⚠ 该用例分配给 <b>${esc(assignedName)}</b>，仅被分配人可执行，你只能查看`
+        : `⚠ 你不是该用例的执行人，只能查看`)
+    : '';
   let html = `
     <div style="margin-bottom:12px;padding:10px 12px;background:var(--bg);border-radius:8px">
       <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
@@ -4282,9 +5236,9 @@ function renderCaseExecBody() {
       </div>
       <div style="font-size:12px;color:var(--muted)">共 ${steps.length} 步 ｜ 分配给：<b>${esc(assignedName)}</b></div>
     </div>
-    ${!isAssignedToMe ? `<div style="margin-top:6px;padding:6px 10px;background:#fef3c7;border-radius:6px;font-size:12px;color:#92400e">⚠ 该用例分配给 <b>${esc(assignedName)}</b>，你只能查看不能编辑</div>` : ''}
-    ${c.precondition ? `<div style="font-size:12px;color:var(--muted);margin-top:6px"><b>前置条件：</b>${esc(c.precondition)}</div>` : ''}
-    <div style="font-size:11px;color:var(--muted);margin-top:6px">规则：任一步骤失败→用例失败；任一阻塞→用例阻塞；全部通过→用例通过</div>
+    ${lockTip ? `<div style="margin-top:6px;padding:6px 10px;background:#fef3c7;border-radius:6px;font-size:12px;color:#92400e">${lockTip}</div>` : ''}
+    ${c.precondition ? `<div style="font-size:12px;color:var(--muted);margin-top:6px;white-space:pre-wrap;overflow-wrap:anywhere"><b>前置条件：</b>${esc(decodeEntities(c.precondition))}</div>` : ''}
+    <div style="font-size:11px;color:var(--muted);margin-top:6px">规则：任一步骤失败→用例失败；否则任一阻塞→用例阻塞；<b>所有步骤都已标记</b>且无失败/阻塞→用例通过（全部「不支持」→不支持）；还有步骤未执行→保存为<b>部分执行</b>，下次打开接着测，不算通过</div>
   </div>`;
   if (!steps.length) {
     html += '<div class="empty">该用例没有步骤数据</div>';
@@ -4296,23 +5250,23 @@ function renderCaseExecBody() {
         ? `<span class="badge ${stepStatus === 'pass' ? 'badge-green' : stepStatus === 'fail' ? 'badge-red' : 'badge-amber'}" style="font-size:11px">${{pass:'通过',fail:'失败',block:'阻塞'}[stepStatus]}</span>`
         : '<span class="badge badge-gray" style="font-size:11px">未测</span>';
       const showStepDetail = stepStatus === 'fail' || stepStatus === 'block';
-      return `<div style="padding:10px 0;border-top:1px dashed var(--border)">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
-          <div style="flex:1;min-width:0">
-            <div style="font-size:12px;color:var(--muted);margin-bottom:3px">步骤 ${si+1}</div>
-            <div style="font-size:13px;margin-bottom:4px">${esc(s.desc || '')}</div>
-            ${s.expect ? `<div style="font-size:12px;color:var(--muted)"><b>预期：</b>${esc(s.expect)}</div>` : ''}
-          </div>
-          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
-            <div>${stepBadge}</div>
-            ${canEdit ? `<span style="white-space:nowrap">
-              <button class="btn btn-sm" style="padding:2px 8px;font-size:11px;background:#dcfce7;color:#16a34a" onclick="recordCaseStepResult(${taskId}, ${linkId}, ${si}, 'pass')">✓ 通过</button>
-              <button class="btn btn-sm" style="padding:2px 8px;font-size:11px;background:#fee2e2;color:#dc2626" onclick="recordCaseStepResult(${taskId}, ${linkId}, ${si}, 'fail')">✗ 失败</button>
-              <button class="btn btn-sm" style="padding:2px 8px;font-size:11px;background:#fef3c7;color:#d97706" onclick="recordCaseStepResult(${taskId}, ${linkId}, ${si}, 'block')">⏸ 阻塞</button>
-              <button class="btn btn-sm" style="padding:2px 8px;font-size:11px;background:#f1f5f9;color:#64748b" onclick="recordCaseStepResult(${taskId}, ${linkId}, ${si}, 'na')">⊘ 不支持</button>
-            </span>` : ''}
-          </div>
+      // 2026-11-26 改版：原来「文字 | 按钮」同一行两列，弹窗 780px 时文字列只剩 428px，
+      // 长 URL 一行画到 573px 溢出到按钮列下面被按钮盖住；换行还被 white-space:normal 吞掉。
+      // 现在按钮独占卡片顶行，操作/预期各占整宽文本块（stepTextBlock 保留换行 + 强制折行 + 解码实体）。
+      const expanded = caseExecCtx.expanded;
+      return `<div class="step-card">
+        <div class="step-head">
+          <div class="step-head-l"><b>步骤 ${si+1}</b>${stepBadge}</div>
+          ${canEdit ? `<div class="step-btns">
+            <button class="btn btn-sm" style="padding:2px 8px;font-size:11px;background:#dcfce7;color:#16a34a" onclick="recordCaseStepResult(${taskId}, ${linkId}, ${si}, 'pass')">✓ 通过</button>
+            <button class="btn btn-sm" style="padding:2px 8px;font-size:11px;background:#fee2e2;color:#dc2626" onclick="recordCaseStepResult(${taskId}, ${linkId}, ${si}, 'fail')">✗ 失败</button>
+            <button class="btn btn-sm" style="padding:2px 8px;font-size:11px;background:#fef3c7;color:#d97706" onclick="recordCaseStepResult(${taskId}, ${linkId}, ${si}, 'block')">⏸ 阻塞</button>
+            <button class="btn btn-sm" style="padding:2px 8px;font-size:11px;background:#f1f5f9;color:#64748b" onclick="recordCaseStepResult(${taskId}, ${linkId}, ${si}, 'na')">⊘ 不支持</button>
+            <button class="btn btn-sm" style="padding:2px 8px;font-size:11px;background:#fff;color:#64748b;border:1px dashed var(--border)" title="把这一步标回未测" onclick="recordCaseStepResult(${taskId}, ${linkId}, ${si}, '')">↺ 未执行</button>
+          </div>` : ''}
         </div>
+        ${stepTextBlock('操作', s.desc, `${si}:desc`, expanded)}
+        ${stepTextBlock('预期', s.expect, `${si}:expect`, expanded)}
         ${showStepDetail && canEdit ? `
         <div style="margin-top:8px;padding:8px 10px;background:#fffbeb;border-radius:6px;border-left:3px solid ${stepStatus === 'fail' ? '#dc2626' : '#d97706'}">
           <div style="font-size:12px;color:var(--text-sub);margin-bottom:4px"><b>失败/阻塞原因（必填）：</b></div>
@@ -4346,16 +5300,18 @@ function renderCaseExecBody() {
   });
 }
 
-// 根据步骤结果推导用例整体状态
-function deriveOverallStatus(stepResults) {
+// 根据步骤结果推导用例整体状态；totalSteps 传用例的步骤数。
+// 判「通过/不支持」的前提是所有步骤都已标记；没测完且无失败/阻塞 → 'partial'（部分执行，可保存，下次接着测）；一个步骤都没标 → null。
+// totalSteps 传用例的步骤数。与后端 api/cases.py::_derive_case_status 同口径，改规则两边一起改。
+function deriveOverallStatus(stepResults, totalSteps) {
   if (!stepResults || !stepResults.length) return null;
   const hasFail = stepResults.some(s => s.status === 'fail');
   const hasBlock = stepResults.some(s => s.status === 'block');
-  const allNa = stepResults.every(s => s.status === 'na');
   if (hasFail) return 'fail';
   if (hasBlock) return 'block';
-  if (allNa) return 'na';
-  return 'pass';
+  const complete = !totalSteps || stepResults.length >= totalSteps;
+  if (!complete) return 'partial';
+  return stepResults.every(s => s.status === 'na') ? 'na' : 'pass';
 }
 
 // ============ 用例执行弹窗：确认 ============
@@ -4371,6 +5327,12 @@ async function confirmCaseExec() {
   const c = linkedCasesCache.find(x => x.id === linkId) || caseExecCtx.caseData;
   const steps = Array.isArray(c?.steps) ? c.steps : [];
   const stepResults = pendingResults || [];
+  // 所有步骤都被标回「未执行」后点确认 → 这条用例恢复为待执行（已有结果则清除，没有则直接关闭）
+  if (!stepResults.length) {
+    if (caseExecCtx.edited && c?.latest_result) await clearCaseResult(taskId, linkId);
+    else closeModal('caseExecModal');
+    return;
+  }
   // 先把当前 textarea 里的内容同步到 pending，避免用户没点「保存原因」
   steps.forEach((s, si) => {
     const ta = document.getElementById(`stepActual_${stepId}_${linkId}_${si}`);
@@ -4406,8 +5368,9 @@ async function confirmCaseExec() {
 }
 
 async function submitCaseResult(taskId, linkId, c, stepResults) {
-  const overall = deriveOverallStatus(stepResults);
-  const payload = { status: overall || 'pass', step_results: stepResults };
+  const overall = deriveOverallStatus(stepResults, (Array.isArray(c?.steps) ? c.steps.length : 0));
+  if (!overall) { toast('无法确认：请先标记步骤结果', true); return; }
+  const payload = { status: overall, step_results: stepResults };
   try {
     await api(`/api/tasks/${taskId}/cases/${linkId}/result`, { method: 'POST', body: payload });
     // 更新本地 cache，让外层列表立即反映新结果
@@ -4416,7 +5379,22 @@ async function submitCaseResult(taskId, linkId, c, stepResults) {
     closeModal('caseExecModal');
     const step7 = stepCache.find(s => s.step === 7);
     if (step7) loadLinkedCases(taskId, step7.id);
-    toast('用例执行结果已确认');
+    const unmarked = (Array.isArray(c.steps) ? c.steps : []).filter((_, i) => !stepResults.some(r => r.step_idx === i)).length;
+    toast(overall === 'partial' ? `已保存：部分执行（还有 ${unmarked} 步未测），下次打开可接着测` : '用例执行结果已确认');
+  } catch (e) { toast(e.message, true); }
+}
+
+// 弹窗内所有步骤都被标回「未执行」后点了「确认」：清除这条用例的全部执行结果，恢复为待执行
+// （后端同步写操作历史）。没有单独的「重置」按钮——每步的「↺ 未执行」就够用了（2026-11-26 用户定夺）。
+async function clearCaseResult(taskId, linkId) {
+  const c = linkedCasesCache.find(x => x.id === linkId) || (caseExecCtx && caseExecCtx.caseData);
+  try {
+    await api(`/api/tasks/${taskId}/cases/${linkId}/result`, { method: 'DELETE' });
+    closeModal('caseExecModal');
+    if (c) delete c.latest_result;
+    const step7 = stepCache.find(s => s.step === 7);
+    if (step7) loadLinkedCases(taskId, step7.id);
+    toast('已确认：全部步骤未执行，该用例恢复为待执行');
   } catch (e) { toast(e.message, true); }
 }
 
@@ -4425,6 +5403,15 @@ function recordCaseStepResult(taskId, linkId, stepIdx, status) {
   if (!caseExecCtx || caseExecCtx.linkId !== linkId) return;
   const stepId = caseExecCtx.stepId;
   const pending = caseExecCtx.pendingResults || (caseExecCtx.pendingResults = []);
+  // status 为空 = 「未执行」：把这一步的结果撤掉（点错了可以标回未测，全部撤掉后确认即整条重置）
+  if (!status) {
+    const i = pending.findIndex(s => s.step_idx === stepIdx);
+    if (i >= 0) pending.splice(i, 1);
+    caseExecCtx.edited = true;
+    renderCaseExecBody();
+    return;
+  }
+  caseExecCtx.edited = true;
   // 从当前文本框读取实际情况（如果已填写）
   let actual = '';
   if (status === 'fail' || status === 'block') {
@@ -4493,10 +5480,7 @@ async function loadStepIssueFiles(stepId, caseId, stepIdx) {
       filesEl.innerHTML = '<span class="muted" style="font-size:10px">暂无附件</span>';
       return;
     }
-    const canDelete = currentTask && (() => {
-      const s = stepCache.find(x => x.id === stepId);
-      return s && (s.assigned_to === currentUser.id || s.assigned_to === null || (currentTask.executors || []).some(e => e.user_id === currentUser.id));
-    })();
+    const canDelete = currentTask && canOperateStep(stepCache.find(x => x.id === stepId), currentTask);
     filesEl.innerHTML = mine.map(f => {
       const dlUrl = `/api/tasks/${currentTask.id}/steps/${stepId}/files/${f.id}/download`;
       return `<div style="display:flex;align-items:center;gap:4px;padding:1px 0;font-size:10px">
@@ -4834,6 +5818,88 @@ function selectStep(stepNo) {
   renderStepPage(activeStepNo);
 }
 
+// 环节实际起止时间留底：点「开始」开启一轮，提交完成收口本轮。
+// 被打回/回退重做后重新点「开始」就是第2轮、第3轮…，历史轮次全部保留。
+// 只做记录与展示，不参与任何校验，也不影响流程推进。
+function fmtDuration(ms) {
+  if (!(ms > 0)) return '0 分钟';
+  const mins = ms / 60000;
+  if (mins < 60) return `${Math.max(1, Math.round(mins))} 分钟`;
+  const hrs = mins / 60;
+  if (hrs < 24) return `${hrs.toFixed(1)} 小时`;
+  const days = hrs / 24;
+  return `${days.toFixed(days < 10 ? 1 : 0)} 天`;
+}
+
+const ROUND_OUTCOME_ZH = { completed: '已完成', rejected: '被打回', rolled_back: '被回退', in_progress: '进行中' };
+
+function renderRoundChip(r) {
+  const st = r.start ? formatDateTime(r.start) : '—';
+  const en = r.end ? formatDateTime(r.end) : '至今';
+  let dur = '';
+  if (r.start && r.end) dur = fmtDuration(new Date(r.end) - new Date(r.start));
+  else if (r.start) dur = '已进行 ' + fmtDuration(Date.now() - new Date(r.start));
+  const oc = ROUND_OUTCOME_ZH[r.outcome] || (r.end ? '已完成' : '进行中');
+  return `<span class="round-chip ${r.outcome || ''}">第${r.n}轮 <b>${st}</b> → <b>${en}</b>`
+    + `<i>${oc}</i>${dur ? `<span>${dur}</span>` : ''}</span>`;
+}
+
+function renderStepTiming(s, isCurrent, canOperate, taskId) {
+  const isDone = s.status === 'completed' || s.status === 'done';
+  const rounds = Array.isArray(s.rounds) ? s.rounds : [];
+  const cur = rounds.length ? rounds[rounds.length - 1] : null;
+  // 被打回/被回退后等待重做：begin_date 已清空，但末轮结局是 rejected/rolled_back。
+  // 这时上一轮的 start/end 只是历史，不能当成"本轮已开始"，否则开始按钮会消失、环节卡死。
+  const reworkIdle = !!cur && !s.begin_date && (cur.outcome === 'rejected' || cur.outcome === 'rolled_back');
+  // 当前轮的起止优先读 rounds 末轮；老数据（无 rounds）兜底读 begin_date/end_date
+  const began = reworkIdle ? null : ((cur && cur.start) || s.begin_date || null);
+  const ended = reworkIdle ? null : ((cur ? cur.end : (isDone ? s.end_date : null)) || null);
+  const roundNo = rounds.length || (began ? 1 : 0);
+
+  let durTxt = '';
+  if (began && ended) {
+    durTxt = `耗时 ${fmtDuration(new Date(ended) - new Date(began))}`;
+  } else if (began) {
+    durTxt = `已进行 ${fmtDuration(Date.now() - new Date(began))}`;
+  }
+  const parts = [];
+  if (roundNo > 1) parts.push(`<span class="round-badge">第 ${roundNo} 轮</span>`);
+  if (began) {
+    parts.push(`<span>实际开始：<b>${formatDateTime(began)}</b></span>`);
+  } else if (reworkIdle) {
+    parts.push(`<span style="color:var(--warning)">第 ${cur.n} 轮${ROUND_OUTCOME_ZH[cur.outcome]}，重做请先点「开始」</span>`);
+  } else if (isDone) {
+    parts.push(`<span style="color:var(--warning)">未记录开始时间（完成时未点「开始」）</span>`);
+  } else {
+    parts.push(`<span style="color:var(--text-sub)">尚未开始</span>`);
+  }
+  if (ended) {
+    const lbl = (cur && cur.outcome && cur.outcome !== 'completed') ? '本轮结束' : '实际完成';
+    parts.push(`<span>${lbl}：<b>${formatDateTime(ended)}</b></span>`);
+  }
+  if (durTxt) parts.push(`<span class="badge badge-gray">${durTxt}</span>`);
+  const canStart = isCurrent && canOperate && !isDone && !began;
+  const startLabel = rounds.length ? `▶ 开始第 ${rounds.length + 1} 轮` : '▶ 开始本环节';
+  const btn = canStart
+    ? `<button class="btn btn-sm btn-primary" onclick="startStep(${taskId}, ${s.id}, ${s.step})">${startLabel}</button>`
+    : '';
+  // 只有真的重做过（多于一轮，或唯一一轮已被打回）才展开历史，正常单轮不占地方
+  const showHistory = rounds.length > 1 || (rounds.length === 1 && rounds[0].outcome !== 'completed');
+  return `<div style="padding:9px 20px;border-bottom:${showHistory ? 'none' : '1px solid var(--border)'};background:#fafbfc;display:flex;gap:16px;align-items:center;flex-wrap:wrap;font-size:13px">
+    ${parts.join('')}${btn ? `<span style="margin-left:auto">${btn}</span>` : ''}
+  </div>` + (showHistory ? `<div class="step-rounds">${rounds.map(renderRoundChip).join('')}</div>` : '');
+}
+
+async function startStep(taskId, stepId, stepNo) {
+  const st = (stepCache || []).find(x => x.id === stepId);
+  const n = ((st && Array.isArray(st.rounds)) ? st.rounds.length : 0) + 1;
+  try {
+    await api(`/api/tasks/${taskId}/steps/${stepId}`, { method: 'PUT', body: { status: 'in_progress' } });
+    toast(n > 1 ? `已记录第 ${n} 轮实际开始时间` : '已记录实际开始时间');
+    await loadSteps(taskId);
+  } catch (e) { toast(e.message, true); }
+}
+
 function renderStepPage(stepNo) {
   const wrap = document.getElementById('stepPageContent');
   if (!wrap) return;
@@ -4841,14 +5907,34 @@ function renderStepPage(stepNo) {
   if (!s) { wrap.innerHTML = '<div class="card"><div class="empty">步骤数据不存在</div></div>'; return; }
   const taskId = currentTask.id;
   const isCurrent = currentTask && parseInt(s.step) === parseInt(currentTask.current_step);
-  // 操作权严格按 assigned_to 判断：admin 不再自动获得业务环节操作权
-  // 步骤7（执行测试）比较特殊：所有测试执行人（executor_id + executors 列表）都有操作权限
-  const isStep7Executor = s.step === 7 && currentTask && (
-    currentTask.executor_id === currentUser.id ||
-    (currentTask.executors || []).some(e => e.user_id === currentUser.id)
-  );
-  const canOperate = s.assigned_to === currentUser.id || s.assigned_to === null || isStep7Executor;
+  // 操作权统一走 canOperateStep()（唯一口径，对应后端 step_perms.can_operate_step）：
+  // admin 不自动获得业务环节操作权；环节7 = 主执行人+executors；环节9 = 任务 PL+TSE；
+  // 未指定负责人 = PL 兜底或该环节对应角色（1/5→PL、2→TSE、3/4/6/8→版本负责人、7→执行人）。
+  const canOperate = canOperateStep(s, currentTask);
   const statusLabel = { pending:'待处理', in_progress:'进行中', completed:'已完成', rejected:'已驳回', done:'已完成' }[s.status] || s.status;
+  // 未点「开始」→ 整块操作区锁定（置灰 + 拦截交互），只保留顶部「开始」按钮。
+  // 这样每个环节都有明确的计时起点，也避免"还没开始就把数据填了"导致耗时失真。
+  // 已完成/非当前环节不加锁：那是查看态，本来就不该拦。
+  const isDoneStep = s.status === 'completed' || s.status === 'done';
+  const locked = isCurrent && canOperate && !isDoneStep && !s.begin_date;
+
+  const bodyHtml = `
+      ${s.remark ? `<div class="step-desc" style="margin-bottom:10px">${esc(s.remark)}</div>` : ''}
+      ${renderStepForm(s, taskId, isCurrent, canOperate)}
+      ${s.step === 3 ? renderTaskVersionSection(s, taskId, isCurrent, canOperate) : ''}
+      ${STEP_FORMS[s.step]?.attachments ? renderStepFiles(s, taskId, isCurrent && canOperate, STEP_FORMS[s.step].attachments) : ''}
+      ${(s.step === 2 || s.step === 7) ? renderCaseSection(s, taskId, isCurrent, canOperate) : ''}
+      ${s.step === 6 ? renderCaseAssignSection(s, taskId, isCurrent, canOperate) : ''}`;
+
+  const bodyWrapped = locked
+    ? `<div class="step-lock">
+        <div class="step-lock-inner">${bodyHtml}</div>
+        <div class="step-lock-mask"><div class="step-lock-tip">
+          <div style="font-size:15px;font-weight:600;color:var(--text-main);margin-bottom:2px">🔒 本环节尚未开始</div>
+          <div>请先点上方「▶ 开始」按钮，开始后才能填写数据、上传附件与提交完成</div>
+        </div></div>
+      </div>`
+    : bodyHtml;
 
   let html = `<div class="card">
     <div class="card-head" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
@@ -4861,16 +5947,17 @@ function renderStepPage(stepNo) {
           if (currentTask.executor_id) names.push(userName(currentTask.executor_id));
           (currentTask.executors || []).forEach(e => { if (e.user_id && !names.includes(userName(e.user_id))) names.push(userName(e.user_id)); });
           return names.length ? esc(names.join('、')) : '—';
-        })() : '—') : (s.assigned_to ? esc(userName(s.assigned_to)) : (s.step === 9 && currentTask ? `PL:${esc(userName(currentTask.owner))} + TSE:${esc(userName(currentTask.tse_id))}` : '全员'))}</span>
+        })() : '—') : (s.assigned_to ? esc(userName(s.assigned_to)) : (s.step === 9 && currentTask ? `PL:${esc(userName(currentTask.owner))} + TSE:${esc(userName(currentTask.tse_id))}` : (() => {
+          // 未指定负责人 → 按该环节对应角色兜底（与 step_perms.STEP_ROLE_FALLBACK 一致），不能再写「全员」
+          const lbs = (STEP_ROLE_FALLBACK[s.step] || []).map(r => STEP_ROLE_ZH[r]).filter(Boolean).join('/');
+          return lbs ? `未指定（${esc(lbs)} 可操作）` : '—';
+        })()))}</span>
       </div>
       ${s.step === 8 ? `<button class="btn btn-sm" onclick="exportTestTracking(${taskId})">⬇ 导出测试跟踪记录表</button>` : ''}
     </div>
+    ${renderStepTiming(s, isCurrent, canOperate, taskId)}
     <div style="padding:16px 20px">
-      ${s.remark ? `<div class="step-desc" style="margin-bottom:10px">${esc(s.remark)}</div>` : ''}
-      ${renderStepForm(s, taskId, isCurrent, canOperate)}
-      ${STEP_FORMS[s.step]?.attachments ? renderStepFiles(s, taskId, isCurrent && canOperate, STEP_FORMS[s.step].attachments) : ''}
-      ${(s.step === 2 || s.step === 7) ? renderCaseSection(s, taskId, isCurrent, canOperate) : ''}
-      ${s.step === 6 ? renderCaseAssignSection(s, taskId, isCurrent, canOperate) : ''}
+      ${bodyWrapped}
     </div>
   </div>`;
 
@@ -4885,6 +5972,10 @@ function renderStepPage(stepNo) {
   // 步骤2/7: 加载已关联用例
   if (s.step === 2 || s.step === 7) {
     loadLinkedCases(taskId, s.id);
+  }
+  // 步骤3: 版本配套核对表
+  if (s.step === 3) {
+    loadTaskVersionConfig(s.id, taskId, isCurrent && canOperate);
   }
   // 步骤6: 加载已关联用例（用于分配执行人）
   if (s.step === 6) {
@@ -4945,9 +6036,9 @@ async function loadStepFiles(stepId) {
       listEl.innerHTML = '<span class="muted" style="font-size:12px">暂无附件</span>';
       return;
     }
-    // 权限：admin 或步骤 assignee 或 全员环节 才能删除
+    // 删除附件权限与环节操作权同口径（后端 files.py 也用 can_operate_step 校验）
     const s = stepCache.find(x => x.id === stepId);
-    const canDelete = currentUser && ((s && s.assigned_to === currentUser.id) || (s && s.assigned_to === null));
+    const canDelete = canOperateStep(s, currentTask);
     listEl.innerHTML = files.map(f => {
       const dlUrl = `/api/tasks/${currentTask.id}/steps/${stepId}/files/${f.id}/download`;
       const ext = (f.original_name || '').split('.').pop().toLowerCase();
@@ -5372,7 +6463,7 @@ let executorRows = [];
 let executorSeq = 0; // 自增序号，作为行的唯一标识（避免删除后下标漂移）
 
 async function openCreateModal() {
-  if (!usersCache.length) { toast('请先在「人员与角色」页添加用户', true); return; }
+  if (!activeUsers().length) { toast('请先在「人员与角色」页添加用户', true); return; }
   ['cName','cVersion','cDesc','cBegin','cEnd'].forEach(id => document.getElementById(id).value = '');
   document.getElementById('cProduct').value = '';
   document.getElementById('cProject').value = '';
@@ -5380,12 +6471,12 @@ async function openCreateModal() {
   executorRows = [];
   executorSeq = 0;
   document.getElementById('executorsList').innerHTML = '';
+  resetTaskDateInputs();   // 连 min/max 一起清，避免上次项目的周期约束残留
   // 确保产品项目下拉已填充
   fillProductSelect('cProduct');
   if (!zentaoProjectsCache.length) await loadZentaoProjects();
-  // 按默认选中的产品过滤项目下拉
-  const defaultProdId = document.getElementById('cProduct').value;
-  fillProjectSelect(defaultProdId);
+  // 产品此时为空 → 项目下拉显示「— 请先选择产品 —」，不列任何项目
+  fillProjectSelect(document.getElementById('cProduct').value);
   document.getElementById('createModal').classList.add('show');
 }
 // ============ 工作台四卡点开列表(2026-09-23) ============
@@ -5782,7 +6873,7 @@ function refreshExecutorOptions() {
   });
   const executorUsers = (usersCache || []).filter(u => {
     const roles = u.roles || (u.role ? [u.role] : []);
-    return roles.includes('executor');
+    return roles.includes('executor') && u.is_active !== false;
   });
   document.querySelectorAll('select[id^="execUser_"]').forEach(s => {
     const cur = s.value;
@@ -5826,12 +6917,24 @@ async function createTask() {
   if (!name) { toast('请填写任务名称', true); return; }
   const owner = document.getElementById('cOwner').value;
   if (!owner) { toast('请选择PL负责人', true); return; }
+  // 产品先于项目校验：项目下拉依赖产品（产品未选时项目为空），顺序反了会先报"请选择项目"，误导
+  const productId = document.getElementById('cProduct').value;
+  if (!productId) { toast('请选择待测产品', true); return; }
   const projectId = document.getElementById('cProject').value;
   if (!projectId) { toast('请选择所属项目', true); return; }
-  const productId = document.getElementById('cProduct').value;
-  if (!productId) { toast('请选择所属产品', true); return; }
+  // 以下四个角色字段都是必填：它们直接决定 9 步流程里各环节的负责人
+  // （PL→环节1/5、TSE→环节2、版本负责人→环节3/4/6/8、测试执行人→环节7）。
+  // 留空会让该环节没人有权操作（历史 bug：TSE 留空 → 「测试设计」环节卡死）。
+  const tseId = document.getElementById('cTse').value;
+  if (!tseId) { toast('请选择 TSE：TSE 决定「测试设计」环节的操作权', true); return; }
+  const versionOwnerId = document.getElementById('cVersionOwner').value;
+  if (!versionOwnerId) { toast('请选择版本负责人：版本负责人决定「版本配套/环境确认/用例分配/测试完成」四个环节的操作权', true); return; }
+  const primaryExecutorId = document.getElementById('cExecutor').value;
+  if (!primaryExecutorId) { toast('请选择测试执行人：测试执行人决定「执行测试」环节的操作权', true); return; }
   const begin = document.getElementById('cBegin').value;
   const end = document.getElementById('cEnd').value;
+  if (!begin) { toast('请填写任务开始日期', true); return; }
+  if (!end) { toast('请填写任务结束日期', true); return; }
   // 任务周期必须落在项目周期内
   if (projectId) {
     const proj = zentaoProjectsCache.find(p => p.id == projectId);
@@ -5867,12 +6970,12 @@ async function createTask() {
     version: document.getElementById('cVersion').value.trim() || null,
     test_type: document.getElementById('cType').value,
     owner: parseInt(owner),
-    tse_id: document.getElementById('cTse').value ? parseInt(document.getElementById('cTse').value) : null,
-    version_owner: document.getElementById('cVersionOwner').value ? parseInt(document.getElementById('cVersionOwner').value) : null,
+    tse_id: parseInt(tseId),
+    version_owner: parseInt(versionOwnerId),
     executor_id: executorId,
     executors: extraExecutors.length ? extraExecutors : (executorId ? [{ user_id: executorId }] : []),
-    begin_date: begin || null,
-    end_date: end || null,
+    begin_date: begin,
+    end_date: end,
     description: document.getElementById('cDesc').value.trim() || null,
   };
   try {
@@ -5977,11 +7080,17 @@ function renderUserRoles() {
   const allRoles = [['admin','管理员'],['pl','PL'],['tse','TSE'],['version_owner','版本负责人'],['executor','测试执行']];
   body.innerHTML = visibleUsers.map(u => {
     const userRoles = u.roles || (u.role ? [u.role] : []);
+    const isOff = u.is_active === false;
     const resetBtn = isAdmin ? ` <button class="btn btn-sm" style="font-size:11px;padding:2px 6px;margin-left:6px" onclick="adminResetPassword(${u.id})">重置密码</button>` : '';
     const delBtn = isAdmin && u.account !== 'admin' ? ` <button class="btn btn-sm" style="font-size:11px;padding:2px 6px;color:var(--danger)" onclick="deleteUser(${u.id})">删除</button>` : '';
+    // 离职处理：停用保留账号与历史，可随时启用；内置 admin 不提供停用入口
+    const statusBtn = isAdmin && u.account !== 'admin'
+      ? ` <button class="btn btn-sm" style="font-size:11px;padding:2px 6px;${isOff ? 'color:var(--success)' : 'color:var(--warning)'}" onclick="toggleUserStatus(${u.id}, ${isOff})">${isOff ? '启用' : '停用'}</button>`
+      : '';
+    const offBadge = isOff ? ` <span class="badge" style="background:#94a3b815;color:#64748b">已停用</span>` : '';
     if (!isAdmin) {
       const badges = userRoles.map(r => `<span class="badge" style="background:${ROLE_COLOR[r] || '#94a3b8'}15;color:${ROLE_COLOR[r] || '#94a3b8'}">${ROLE_NAME[r] || r}</span>`).join(' ');
-      return `<tr><td style="font-weight:500">${esc(u.realname || u.account)}</td><td style="font-family:monospace;color:var(--muted)">${esc(u.account)}</td><td>${badges || '<span class="muted">未分配</span>'}</td></tr>`;
+      return `<tr><td style="font-weight:500">${esc(u.realname || u.account)}${offBadge}</td><td style="font-family:monospace;color:var(--muted)">${esc(u.account)}</td><td>${badges || '<span class="muted">未分配</span>'}</td></tr>`;
     }
     // admin用户的管理员角色置灰
     const checks = allRoles.map(([k,v]) => {
@@ -5990,7 +7099,7 @@ function renderUserRoles() {
       const lockedStyle = isLocked ? 'opacity:.5;cursor:not-allowed' : 'cursor:pointer';
       return `<label style="display:inline-flex;align-items:center;gap:3px;margin-right:8px;font-size:13px;${lockedStyle}"><input type="checkbox" value="${k}" ${userRoles.includes(k)?'checked':''} ${disabled} ${isLocked?'':`onchange="toggleUserRole(${u.id})"`} style="accent-color:${ROLE_COLOR[k]}"> ${v}</label>`;
     }).join('');
-    return `<tr><td style="font-weight:500">${esc(u.realname || u.account)}${resetBtn}${delBtn}</td><td style="font-family:monospace;color:var(--muted)">${esc(u.account)}</td><td>${checks}</td></tr>`;
+    return `<tr${isOff ? ' style="opacity:.62"' : ''}><td style="font-weight:500">${esc(u.realname || u.account)}${offBadge}${resetBtn}${statusBtn}${delBtn}</td><td style="font-family:monospace;color:var(--muted)">${esc(u.account)}</td><td>${checks}</td></tr>`;
   }).join('');
 }
 
@@ -6102,6 +7211,21 @@ async function adminResetPassword(userId) {
   } catch (e) { toast(e.message, true); }
 }
 
+async function toggleUserStatus(userId, activate) {
+  const u = usersCache.find(x => x.id === userId);
+  if (!u) return;
+  const nm = `${u.realname || u.account}（${u.account}）`;
+  const msg = activate
+    ? `确认启用 ${nm}？\n\n启用后可正常登录，并重新出现在负责人/执行人下拉中。`
+    : `确认停用 ${nm}？\n\n停用后立即生效：\n· 无法登录，已登录的会话下次请求即失效\n· 不再出现在负责人/执行人下拉中\n· 账号和历史记录全部保留，随时可启用回来\n\n离职请用停用，不要用删除。`;
+  if (!confirm(msg)) return;
+  try {
+    await api(`/api/users/${userId}/status`, { method: 'PATCH', body: { is_active: !!activate } });
+    toast(activate ? '账号已启用' : '账号已停用（历史记录保留）');
+    loadUsers();
+  } catch (e) { toast(e.message, true); }
+}
+
 async function deleteUser(userId) {
   const u = usersCache.find(x => x.id === userId);
   if (!u) return;
@@ -6115,6 +7239,40 @@ async function deleteUser(userId) {
 
 // ============ 产品与项目管理 ============
 let ppSelectedProductId = null;
+let ppTab = 'projects';   // projects | vc（版本配套表）
+
+// 产品与项目内部页签：项目 / 版本配套表
+function switchPPTab(tab) {
+  ppTab = (tab === 'vc') ? 'vc' : 'projects';
+  const isVc = ppTab === 'vc';
+  const btnP = document.getElementById('ppTabBtnProjects');
+  const btnV = document.getElementById('ppTabBtnVc');
+  if (btnP) btnP.classList.toggle('btn-primary', !isVc);
+  if (btnV) btnV.classList.toggle('btn-primary', isVc);
+  const panelP = document.getElementById('ppTabProjects');
+  const panelV = document.getElementById('ppTabVc');
+  if (panelP) panelP.style.display = isVc ? 'none' : '';
+  if (panelV) panelV.style.display = isVc ? '' : 'none';
+  const actP = document.getElementById('ppActionProjects');
+  const actV = document.getElementById('ppActionVc');
+  if (actP) actP.style.display = isVc ? 'none' : '';
+  if (actV) actV.style.display = isVc ? '' : 'none';
+  if (isVc) {
+    // 每次进入页签都回到列表态并按当前产品重载
+    const dv = document.getElementById('vcDetailView');
+    const lv = document.getElementById('vcListView');
+    if (dv) dv.style.display = 'none';
+    if (lv) lv.style.display = '';
+    const col = document.getElementById('ppProductCol');
+    if (col) col.style.display = '';
+    currentVcId = null;
+    currentVcDetail = null;
+    loadVersionConfigs();
+  } else {
+    const col = document.getElementById('ppProductCol');
+    if (col) col.style.display = '';
+  }
+}
 
 async function loadPPPage() {
   // 快照hash必须在同步段(switchView尾部截段竞态,tasks/issues同课):
@@ -6140,9 +7298,10 @@ async function loadPPPage() {
     }
   }
   const ppDesc = document.getElementById('ppDesc');
-  if (ppDesc) ppDesc.textContent = canManageTasks() ? '点击左侧产品查看对应项目' : '点击左侧产品查看对应项目（只读）';
+  if (ppDesc) ppDesc.textContent = canManageTasks() ? '左侧选择产品，右侧查看项目与版本配套表' : '左侧选择产品，右侧查看项目与版本配套表（产品/项目只读）';
   renderPPProductList();
   renderPPProjects();
+  switchPPTab(ppTab);   // 同步页签（版本配套表页签会按当前产品重载列表）
 }
 
 function renderPPProductList() {
@@ -6174,6 +7333,13 @@ function selectPPProduct(productId) {
   if (currentViewKey === 'pp') setViewHash('pp', String(productId));  // 左选即落账(切换产品/他处函数重进一并覆盖,diff幂等)
   renderPPProductList();
   renderPPProjects();
+  // 配套表页签：跟随产品切换重载
+  if (ppTab === 'vc') {
+    currentVcId = null;
+    currentVcDetail = null;
+    setVcDetailMode(false);
+    loadVersionConfigs();
+  }
 }
 
 function renderPPProjects() {

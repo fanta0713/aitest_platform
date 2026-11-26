@@ -35,6 +35,10 @@ class UserCreateReq(BaseModel):
     roles: list = Field(default=["member"], description="角色列表")
 
 
+class UserStatusReq(BaseModel):
+    is_active: bool = Field(..., description="true=启用，false=停用（离职）")
+
+
 def _ensure_role(project_role: str):
     if project_role not in PROJECT_ROLES:
         raise HTTPException(status_code=400, detail=f"无效角色: {project_role}")
@@ -42,18 +46,51 @@ def _ensure_role(project_role: str):
 
 @router.get("/users")
 async def list_users(
+    include_inactive: bool = False,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """用户列表（含角色列表）"""
+    """用户列表（含角色列表）。
+
+    include_inactive=true 仅对管理员生效，用于「人员与角色」页展示已停用（离职）账号；
+    其他人始终只拿到在职账号，保证负责人/执行人下拉选不到离职人员。
+    返回 is_active 供前端区分在职/已停用。
+    """
     from app.core.security import _user_roles
+    is_admin = "admin" in _user_roles(user)
     service = UserService(db)
-    users = await service.list_users()
+    users = await service.list_users(include_inactive=include_inactive and is_admin)
     return [
         {"id": u.id, "account": u.account, "realname": u.realname,
-         "role": u.role, "roles": _user_roles(u)}
+         "role": u.role, "roles": _user_roles(u), "is_active": u.is_active}
         for u in users
     ]
+
+
+@router.patch("/users/{user_id}/status")
+async def set_user_status(
+    user_id: int,
+    data: UserStatusReq,
+    admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """停用/启用账号（仅管理员）。
+
+    离职处理请用「停用」而不是删除：账号和历史记录全部保留，可随时启用回来。
+    停用后立即生效——登录被拒（auth 校验 is_active）、已签发的 token 下次请求即失效
+    （get_current_user 每次校验 is_active）、并从负责人/执行人下拉中消失。
+    """
+    if user_id == admin.id and not data.is_active:
+        raise HTTPException(status_code=400, detail="不能停用自己的账号")
+    stmt = select(User).where(User.id == user_id)
+    user = (await db.execute(stmt)).scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="用户不存在")
+    if user.account == "admin" and not data.is_active:
+        raise HTTPException(status_code=400, detail="内置管理员账号不可停用")
+    user.is_active = data.is_active
+    await db.commit()
+    return {"ok": True, "id": user.id, "account": user.account, "is_active": user.is_active}
 
 
 @router.put("/users/{user_id}/roles")

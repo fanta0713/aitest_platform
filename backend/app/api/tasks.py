@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 from typing import List, Optional
 from app.db.database import get_db
 from app.core.security import get_current_user, _user_roles
+from app.core.step_perms import assert_can_operate_any
 from app.models.models import User, Project, TaskStep, TaskCaseLink, TaskIssue
 from app.services.task_service import TaskService, IssueService
 from app.schemas.schemas import (
@@ -203,7 +204,10 @@ async def update_task(
     is_pl_or_version_owner = current_user.id in {task.owner, task.version_owner}
     if not (is_admin or is_pl_or_version_owner):
         raise HTTPException(status_code=403, detail="仅管理员、PL或版本负责人可更新此任务")
-    task = await service.update_task(task_id, data)
+    try:
+        task = await service.update_task(task_id, data, current_user.id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     return TaskResponse.model_validate(task)
 
 
@@ -249,9 +253,11 @@ async def update_step(
     """更新步骤状态（仅分配给当前用户的环节可操作，全员环节除外）"""
     service = TaskService(db)
     try:
-        step = await service.update_step(step_id, data, current_user.id, current_user.role == "admin")
+        step = await service.update_step(step_id, data, current_user.id, _user_roles(current_user))
     except PermissionError as e:
         raise HTTPException(status_code=403, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     if not step:
         raise HTTPException(status_code=404, detail="步骤不存在")
     return StepResponse.model_validate(step)
@@ -270,10 +276,12 @@ async def rollback_step(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    """当前环节回退至上一环节（仅PL或当前环节负责人；步骤5/9走既有打回、10为终态）"""
+    """当前环节回退至上一环节（权限与 update_step 同口径：环节负责人；环节7 含全体执行人；
+    负责人为空时仅任务 PL 或该环节对应角色。环节9 走「需补测」打回，不可回退）"""
     service = TaskService(db)
     try:
-        step = await service.rollback_step(task_id, step_id, data.reason, current_user.id)
+        step = await service.rollback_step(task_id, step_id, data.reason, current_user.id,
+                                           _user_roles(current_user))
     except PermissionError as e:
         raise HTTPException(status_code=403, detail=str(e))
     except ValueError as e:
@@ -293,7 +301,7 @@ async def change_step_assignee(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    """PL改派非PL环节(3-8)的责任人——全链以 task_steps.assigned_to 为单一事实源自动同步，操作历史留痕"""
+    """PL改派环节2-8的责任人——全链以 task_steps.assigned_to 为单一事实源自动同步，操作历史留痕"""
     service = TaskService(db)
     try:
         step = await service.change_step_assignee(task_id, step_id, data.assigned_to, current_user)
@@ -323,7 +331,19 @@ async def create_issue(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    """创建问题"""
+    """创建问题（权限：与关联用例同口径——能操作环节2(测试设计) 或环节7(执行测试) 的人）
+
+    2026-11-26 前本接口只要登录就能给任意任务写问题单；而前端唯一入口是环节2/7 用例页的
+    「提交Bug」，本来就只对该环节操作人显示。后端补齐同一口径，避免绕过前端直调。
+    另校验 case_link_id 必须属于本任务（原先可以挂到别的任务的用例上）。
+    """
+    await assert_can_operate_any(db, task_id, (2, 7), current_user, "记录问题单")
+    if data.case_link_id:
+        link = (await db.execute(
+            select(TaskCaseLink).where(TaskCaseLink.id == data.case_link_id)
+        )).scalar_one_or_none()
+        if not link or link.task_id != task_id:
+            raise HTTPException(status_code=400, detail="关联用例不属于该任务")
     service = IssueService(db)
     issue = await service.create_issue(data, current_user.id, task_id)
     return (await _enrich_issues_with_case_title(db, [issue]))[0]

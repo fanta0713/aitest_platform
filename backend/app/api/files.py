@@ -11,6 +11,7 @@ from typing import Optional
 
 from app.db.database import get_db
 from app.core.security import get_current_user, _user_roles
+from app.core.step_perms import can_operate_step, deny_detail
 from app.models.models import User, StepFile, TaskStep, TestTask
 from app.services.task_service import TaskService
 
@@ -34,26 +35,14 @@ def _ensure_upload_dir():
 
 
 def _check_step_permission(step: TaskStep, user: User, task: TestTask = None) -> None:
-    """校验：步骤 assignee 或 全员环节(assigned_to is None) 或 task 的 executors 才能上传/删除。
-    admin 不再自动获得业务环节操作权；如需介入业务环节，需先把自己指派为该环节负责人。"""
-    is_assignee = step.assigned_to == user.id
-    is_all_hands = step.assigned_to is None
-    # 执行测试环节(step==7) 允许任务的所有 executors 上传
-    is_task_executor = False
-    if task and step.step == 7:
-        executor_ids = set()
-        if task.executor_id:
-            executor_ids.add(task.executor_id)
-        if task.executors:
-            for e in task.executors:
-                if isinstance(e, dict) and e.get('user_id'):
-                    executor_ids.add(e['user_id'])
-        is_task_executor = user.id in executor_ids
-    if not (is_assignee or is_all_hands or is_task_executor):
-        raise HTTPException(
-            status_code=403,
-            detail=f"无权操作环节{step.step}「{step.step_name}」的附件，该环节负责人为他人",
-        )
+    """上传/删除附件的权限，统一走 step_perms 口径。
+
+    历史坑：这里原来自己写了一份 `is_all_hands = step.assigned_to is None`，
+    环节9（assigned_to 恒为 NULL 的双人共审环节）因此变成"谁都能传附件"。
+    现在与 update_step 共用 can_operate_step。
+    """
+    if not can_operate_step(step, task, user.id, _user_roles(user)):
+        raise HTTPException(status_code=403, detail=deny_detail(step))
 
 
 @router.get("/{task_id}/steps/{step_id}/files")

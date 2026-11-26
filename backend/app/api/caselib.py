@@ -15,6 +15,7 @@ import csv
 
 from app.db.database import get_db
 from app.core.security import get_current_user, _user_roles
+from app.core.step_perms import assert_can_operate_any
 from app.models.models import (
     User, CaseLibrary, CaseModule, TestCase, TaskCaseLink, CaseResult, TaskIssue
 )
@@ -125,8 +126,13 @@ class ModuleUpdateReq(BaseModel):
 
 
 async def _get_descendant_ids(db: AsyncSession, lib_id: int, parent_id: int) -> list:
-    """递归获取 parent_id 及其全部子孙模块ID（BFS）"""
+    """递归获取 parent_id 及其全部子孙模块ID（BFS）
+
+    visited 去重是必须的：模块 parent_id 一旦成环，原来的 `queue = child_ids` 会
+    在两个模块之间来回无限循环（删除模块 / 按模块查用例都会挂死）。
+    """
     result_ids = [parent_id]
+    seen = {parent_id}
     queue = [parent_id]
     while queue:
         batch = await db.execute(
@@ -135,7 +141,8 @@ async def _get_descendant_ids(db: AsyncSession, lib_id: int, parent_id: int) -> 
                 CaseModule.parent_id.in_(queue)
             )
         )
-        child_ids = batch.scalars().all()
+        child_ids = [cid for cid in batch.scalars().all() if cid not in seen]
+        seen.update(child_ids)
         result_ids.extend(child_ids)
         queue = child_ids
     return result_ids
@@ -231,9 +238,12 @@ async def _load_module_map_and_path_builder(db, case_objs):
             }
 
     def build_path(mid):
+        # 同 cases.py::build_module_path：必须带 visited 环保护，否则模块父链成环时无限循环
         names = []
+        seen = set()
         cur = module_map.get(mid)
-        while cur:
+        while cur and cur.id not in seen:
+            seen.add(cur.id)
             names.insert(0, cur.name)
             cur = module_map.get(cur.parent_id) if cur.parent_id else None
         return names
@@ -463,7 +473,12 @@ async def link_cases_by_module(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """批量关联用例到任务（按模块 或 按用例ID，两者可混用）"""
+    """批量关联用例到任务（按模块 或 按用例ID，两者可混用）
+
+    权限（2026-11-25 补）：测试设计(2) 或 执行测试(7) 的负责人/执行人。
+    此前无校验，任何登录用户都能往任意任务塞用例。
+    """
+    await assert_can_operate_any(db, task_id, (2, 7), user, "关联用例到任务")
     from sqlalchemy import or_
     conds = []
     if data.module_ids:

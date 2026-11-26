@@ -5,11 +5,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, update, delete
 from sqlalchemy.orm import selectinload
 from typing import List, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 from app.models.models import (
     TestTask, TaskStep, TaskIssue, TaskAction,
     TaskStatus, StepStatus, IssueStatus,
-    User, Project, Product, TaskCaseLink, ProjectMember
+    User, Project, Product, TaskCaseLink, ProjectMember,
+    TaskVersionConfig, TaskVersionItem,
 )
 from app.schemas.schemas import (
     TaskCreate, TaskUpdate, TaskStepUpdate, IssueCreate, IssueUpdate,
@@ -17,6 +18,47 @@ from app.schemas.schemas import (
     IssueTreeProject, IssueTreeProduct
 )
 from app.core.security import _user_roles
+from app.core.step_perms import can_operate_step, deny_detail
+
+
+def _now() -> datetime:
+    """统一取 UTC 时间。
+
+    容器与数据库时区均为 UTC，历史代码用 naive `datetime.now()` 写入 timestamptz
+    也是按 UTC 落库，这里显式带 tzinfo 只是为了能安全地序列化进 JSON（rounds），
+    落库瞬间值不变。
+    """
+    return datetime.now(timezone.utc)
+
+
+def _iso(dt: Optional[datetime]) -> Optional[str]:
+    return dt.isoformat() if dt else None
+
+
+def _append_round(rounds, start: datetime) -> list:
+    """开启新一轮：环节每被打回后重新点「开始」，就多一轮记录"""
+    lst = list(rounds) if isinstance(rounds, list) else []
+    lst.append({"n": len(lst) + 1, "start": _iso(start), "end": None, "outcome": "in_progress"})
+    return lst
+
+
+def _close_round(rounds, end: datetime, outcome: str, fallback_start=None) -> list:
+    """收口当前轮：completed=本轮提交完成 / rejected=本轮结果被打回。
+
+    已有 end 的轮次不覆盖 end（例如环节8先完成、随后被环节9打回，
+    完成时刻要保留原值，只把结局从 completed 改成 rejected）。
+    rounds 为空但 begin_date 有值（历史存量数据）时补记第一轮，避免老任务看不到第一轮。
+    """
+    lst = list(rounds) if isinstance(rounds, list) else []
+    if lst:
+        last = dict(lst[-1])
+        if not last.get("end"):
+            last["end"] = _iso(end)
+        last["outcome"] = outcome
+        lst[-1] = last
+    elif fallback_start is not None:
+        lst.append({"n": 1, "start": _iso(fallback_start), "end": _iso(end), "outcome": outcome})
+    return lst
 
 
 # 流程步骤定义（9步；原第10步"任务结束"已裁撤——2026-09-23 用户定夺"感觉没什么用"，
@@ -37,6 +79,7 @@ FLOW_STEPS = [
 # 3/4/6/8 ← version_owner；7 ← executor_id；5 ← owner(PL)。
 # 流程含义：环境审核(5)只有PL有权；7是任务主执行人(executor_id)；8测试完成归版本负责人汇总。
 CASCADE_FIELD = {
+    2: ("tse_id", "TSE"),
     3: ("version_owner", "版本负责人"),
     4: ("version_owner", "版本负责人"),
     6: ("version_owner", "版本负责人"),
@@ -45,6 +88,7 @@ CASCADE_FIELD = {
     5: ("owner", "PL负责人"),
 }
 # 说明:原10"任务结束"的键随环节裁撤移除(其归宿是任务级 status=done,非数据行)。
+# 2026-11-26：环节2 纳入改派（TSE 填错/离职时原先没有任何入口能救，只能改库）。
 
 # 环节家族 ↔ 项目角色(project_role)：改派候选人资格的唯一口径（2026-09-22 需求1/2）。
 # 与 CASCADE_FIELD 家族一一同源——改出去的人必然同时合法占据对应"任务级角色字段"，
@@ -53,7 +97,22 @@ FAMILY_PROJECT_ROLE = {
     "version_owner": ("version_owner", "版本负责人"),
     "executor_id": ("executor", "测试执行人"),
     "owner": ("pl", "PL（项目负责人）"),
+    "tse_id": ("tse", "TSE（测试设计）"),
 }
+
+# 任务级必填字段 ↔ 受其直接驱动的环节（2026-11-26）
+# 用途：① update_task 拒绝把这些字段清空（否则 TaskCreate 的必填被 PUT 绕过）
+#      ② 字段变更时只重铺它自己负责的环节，不做"全量重铺"（避免覆盖手动改派的结果）
+FIELD_STEPS = {
+    "owner": (1, 5),
+    "tse_id": (2,),
+    "version_owner": (3, 4, 6, 8),
+    "executor_id": (7,),
+}
+REQUIRED_TASK_FIELDS = (
+    "name", "product_name", "project_id", "begin_date", "end_date",
+    "owner", "tse_id", "version_owner", "executor_id",
+)
 
 
 class TaskService:
@@ -120,16 +179,18 @@ class TaskService:
     
     async def _auto_complete_step1(self, task_id: int, user_id: int):
         """创建任务后自动完成步骤1，推进到步骤2"""
-        from datetime import datetime
         stmt = select(TaskStep).where(
             TaskStep.task_id == task_id, TaskStep.step == 1
         )
         result = await self.db.execute(stmt)
         step1 = result.scalar_one_or_none()
         if step1:
+            _t = _now()
             step1.status = StepStatus.completed.value
-            step1.begin_date = datetime.now()
-            step1.end_date = datetime.now()
+            step1.begin_date = _t
+            step1.end_date = _t
+            # 自动完成也留一轮记录，保持时间线完整（否则第1步永远没有轮次）
+            step1.rounds = [{"n": 1, "start": _iso(_t), "end": _iso(_t), "outcome": "completed"}]
             step1.remark = "任务创建时自动完成"
 
         # 更新任务 current_step 到2
@@ -232,16 +293,68 @@ class TaskService:
             task.project_name = proj
         return task
     
-    async def update_task(self, task_id: int, data: TaskUpdate) -> Optional[TestTask]:
-        """更新任务"""
+    async def update_task(
+        self, task_id: int, data: TaskUpdate, actor_id: Optional[int] = None
+    ) -> Optional[TestTask]:
+        """更新任务
+
+        2026-11-26 两条硬约束（原实现直接 setattr，导致 TaskCreate 的必填形同虚设）：
+          ① 必填字段不允许被清空——传 null 直接拒绝。前端目前没有"编辑任务"入口，
+             但「执行人管理」等场景走的就是这个 PUT，接口直调更可以绕过建任务校验。
+          ② 角色字段（owner/tse_id/version_owner/executor_id）变更后，把它驱动的
+             环节负责人一并重铺；只重铺该字段负责的环节，且跳过已完成环节，
+             避免覆盖"手动改派"的结果与历史（FIELD_STEPS 见模块顶部）。
+        """
         task = await self.get_task(task_id)
         if not task:
             return None
-        
+
         update_data = data.model_dump(exclude_unset=True)
+
+        # ① 必填字段禁止清空
+        cleared = [f for f in REQUIRED_TASK_FIELDS if f in update_data and update_data[f] is None]
+        if cleared:
+            zh = {
+                "name": "任务名称", "product_name": "待测产品", "project_id": "所属项目",
+                "begin_date": "开始日期", "end_date": "结束日期", "owner": "PL 负责人",
+                "tse_id": "TSE", "version_owner": "版本负责人", "executor_id": "测试执行人",
+            }
+            raise ValueError("以下字段为必填，不允许清空：" + "、".join(zh.get(f, f) for f in cleared))
+
+        # 角色字段：目标用户必须存在且未停用（停用用户登录不了，填了等于没人能操作）
+        for f, zname in (("owner", "PL 负责人"), ("tse_id", "TSE"),
+                         ("version_owner", "版本负责人"), ("executor_id", "测试执行人")):
+            uid = update_data.get(f)
+            if uid is None:
+                continue
+            u = (await self.db.execute(select(User).where(User.id == uid))).scalar_one_or_none()
+            if not u:
+                raise ValueError(f"{zname}指定的用户（ID:{uid}）不存在")
+            if u.is_active is False:
+                raise ValueError(f"{zname}指定的用户 {u.realname or u.account} 已被停用，不能设为负责人")
+
+        step_notes = []
         for key, value in update_data.items():
+            old = getattr(task, key, None)
             setattr(task, key, value)
-        
+            if key not in FIELD_STEPS or value == old:
+                continue
+            # ② 只重铺该字段负责的环节，已完成环节不动（历史只读）
+            for s in (task.steps or []):
+                if s.step not in FIELD_STEPS[key]:
+                    continue
+                if s.status == StepStatus.completed.value:
+                    continue
+                if s.assigned_to != value:
+                    s.assigned_to = value
+                    step_notes.append(f"环节{s.step}「{s.step_name}」")
+
+        if step_notes and actor_id is not None:
+            await self._log_action(
+                task_id, "updated", actor_id,
+                f"任务信息更新，负责人同步：{'、'.join(step_notes)}"
+            )
+
         await self.db.commit()
         await self.db.refresh(task)
         return task
@@ -261,9 +374,12 @@ class TaskService:
         step_id: int, 
         data: TaskStepUpdate, 
         user_id: int,
-        user_is_admin: bool = False
+        user_roles: Optional[List[str]] = None
     ) -> Optional[TaskStep]:
-        """更新步骤状态"""
+        """更新步骤状态
+
+        user_roles 用于「该环节没指定负责人」时按角色兜底（见 app.core.step_perms）。
+        """
         stmt = select(TaskStep).where(TaskStep.id == step_id)
         result = await self.db.execute(stmt)
         step = result.scalar_one_or_none()
@@ -271,28 +387,18 @@ class TaskService:
         if not step:
             return None
 
-        # 权限校验：只有步骤 assignee 或 全员环节(assigned_to is None) 才能操作
+        # 权限校验：统一走 app.core.step_perms.can_operate_step（与附件、用例等接口同一口径）
+        #   ① step.assigned_to == 自己
+        #   ② 环节9 数据审核：仅任务的 PL(owner) 与 TSE —— assigned_to 为 NULL 是"双人共审"，
+        #      不是"全员可操作"（2026-11-25 用户报"版本负责人能替 PL/TSE 审核"的根因）
+        #   ③ 环节7 执行测试：executor_id + executors 列表全员
+        #   ④ 其他环节 assigned_to 为 NULL（=建任务时没指定负责人）：仅 PL 兜底
         # admin 不再自动获得业务环节操作权；如需介入业务环节，需先把自己指派为该环节负责人
-        # assigned_to为None的环节(如步骤9数据审核的PL+TSE双审核)全员可操作
-        # 步骤7（执行测试）特殊：executor_id 和 executors 列表中的用户都可操作
-        is_all_hands = (step.assigned_to is None)
-        is_assignee = (step.assigned_to == user_id)
-        is_step7_executor = False
-        if step.step == 7:
-            task_stmt = select(TestTask).where(TestTask.id == step.task_id)
-            task_result = await self.db.execute(task_stmt)
-            task = task_result.scalar_one_or_none()
-            if task:
-                executor_ids = set()
-                if task.executor_id:
-                    executor_ids.add(task.executor_id)
-                if task.executors:
-                    for e in task.executors:
-                        if isinstance(e, dict) and e.get('user_id'):
-                            executor_ids.add(int(e['user_id']))
-                is_step7_executor = user_id in executor_ids
-        if not is_all_hands and not is_assignee and not is_step7_executor:
-            raise PermissionError(f"无权操作环节{step.step}「{step.step_name}」，该环节负责人为他人")
+        _perm_task = (await self.db.execute(
+            select(TestTask).where(TestTask.id == step.task_id)
+        )).scalar_one_or_none()
+        if not can_operate_step(step, _perm_task, user_id, user_roles):
+            raise PermissionError(deny_detail(step))
 
         # 保存准出条件数据（单独更新或随状态一起）
         if data.ext_data is not None:
@@ -301,15 +407,52 @@ class TaskService:
             step.ext_data = merged
 
         if data.status:
+            # 必须先点「开始本环节」：实际开始时间是耗时统计的唯一来源，不允许跳过直接完成，
+            # 否则 begin_date 为空，后续所有步骤耗时/滞留分析都缺这一条。
+            if data.status == "completed" and step.begin_date is None:
+                raise ValueError(f"请先点「▶ 开始本环节」记录环节{step.step}「{step.step_name}」的实际开始时间，再提交完成")
+
+            # 第三阶段硬校验：所有适用配套项必须已勾选，防止绕过前端直接完成
+            if data.status == "completed" and step.step == 3:
+                vc = (await self.db.execute(
+                    select(TaskVersionConfig).where(TaskVersionConfig.task_id == step.task_id)
+                )).scalar_one_or_none()
+                if not vc:
+                    raise ValueError("请先选择并核对版本配套表，再完成本环节")
+                vc_items = (await self.db.execute(
+                    select(TaskVersionItem).where(TaskVersionItem.task_config_id == vc.id)
+                )).scalars().all()
+                applicable = [
+                    i for i in vc_items
+                    if i.is_applicable and (i.required_value or "").strip() not in ("", "/", "N/A", "n/a", "-")
+                ]
+                if not applicable:
+                    raise ValueError("版本配套表没有可核对条目，请先维护配套表")
+                pending = [i for i in applicable if not i.is_checked]
+                if pending:
+                    raise ValueError(f"版本配套表还有 {len(pending)} 项未核对，请全部勾选后再完成本环节")
+
             step.status = data.status
 
             if data.status == "in_progress" and step.begin_date is None:
-                step.begin_date = datetime.now()
+                # 「开始本环节」：只记一次实际开始时间，重复点不覆盖；
+                # 同时开启新一轮记录（第一次是第1轮，被打回后重做就是第2轮、第3轮…）
+                step.begin_date = _now()
+                step.rounds = _append_round(step.rounds, step.begin_date)
+                # 环节9 防御性清理：审核结论是"本轮裁决"，新一轮开始时绝不能带着上一轮的结论。
+                # _reset_step 已在打回时清过，这里兜住历史残留与其他重开路径；
+                # 只在本次请求没带 ext_data 时清，避免把调用方刚提交的结论误删。
+                if step.step == 9 and data.ext_data is None and isinstance(step.ext_data, dict) and (
+                        step.ext_data.get("pl_review") or step.ext_data.get("tse_review")):
+                    _cleaned = dict(step.ext_data)
+                    _cleaned.pop("pl_review", None)
+                    _cleaned.pop("tse_review", None)
+                    step.ext_data = _cleaned
             if data.status == "completed":
-                # 从 pending 直接完成时，自动补 begin_date（用户没点"开始"）
-                if step.status == StepStatus.pending.value and step.begin_date is None:
-                    step.begin_date = datetime.now()
-                step.end_date = datetime.now()
+                # 走到这里 begin_date 一定非空（上面已硬校验），直接记完成时间
+                step.end_date = _now()
+                step.rounds = _close_round(step.rounds, step.end_date, "completed",
+                                           fallback_start=step.begin_date)
                 if data.remark is not None:
                     step.remark = data.remark
             if data.status == "rejected":
@@ -330,6 +473,22 @@ class TaskService:
             task_stmt = select(TestTask).where(TestTask.id == step.task_id)
             task_result = await self.db.execute(task_stmt)
             task = task_result.scalar_one_or_none()
+            # 打回前先把本轮审核结论归档进操作历史——_reset_step 会清空 ext_data 里的
+            # pl_review/tse_review，不归档就再也查不到"这次是谁判了需补测、什么理由"
+            _ext = step.ext_data or {}
+            _pl = _ext.get("pl_review") or {}
+            _tse = _ext.get("tse_review") or {}
+            if _pl or _tse:
+                def _rv(r: dict) -> str:
+                    if not r.get("result"):
+                        return "未选"
+                    txt = "通过" if r.get("result") == "pass" else "需补测"
+                    rm = (r.get("remark") or "").strip()
+                    return f"{txt}（{rm}）" if rm else txt
+                await self._log_action(
+                    step.task_id, "step_9_review_archived", user_id,
+                    f"环节9打回，本轮审核结论归档：PL={_rv(_pl)}；TSE={_rv(_tse)}"
+                )
             # 只重置环节8（测试完成），环节9自己也重置让审核人重新审核
             await self._reset_step(step.task_id, 8)
             await self._reset_step(step.task_id, 9)
@@ -337,7 +496,16 @@ class TaskService:
         await self._update_task_progress(step.task_id)
 
         # 记录日志
-        action_desc = f"步骤{step.step}状态更新为: {data.status}" if data.status else f"步骤{step.step}准出条件数据更新"
+        if data.status == "in_progress":
+            action_desc = f"开始环节{step.step}「{step.step_name}」，记录实际开始时间"
+        elif data.status == "completed":
+            action_desc = f"完成环节{step.step}「{step.step_name}」，记录实际完成时间"
+        elif data.status == "rejected":
+            action_desc = f"打回环节{step.step}「{step.step_name}」"
+        elif data.status:
+            action_desc = f"步骤{step.step}状态更新为: {data.status}"
+        else:
+            action_desc = f"步骤{step.step}准出条件数据更新"
         await self._log_action(
             step.task_id,
             "step_updated",
@@ -355,10 +523,15 @@ class TaskService:
         step_id: int,
         reason: str,
         user_id: int,
+        user_roles: Optional[List[str]] = None,
     ) -> TaskStep:
         """当前环节回退至上一环节（修订模式：业务数据保留，只动流程状态）
 
-        权限：仅当前环节负责人（步骤7含 executors 全体执行人）；PL 特权已取消
+        回退后两个环节**都回到「尚未开始」**（2026-11-26）：当前环节本轮计时收口、上一环节上一轮
+        计时收口，状态均为 pending；上一环节要等负责人重新点「开始本环节」才开始新一轮计时。
+
+        权限：统一走 step_perms.can_operate_step——环节负责人本人（环节7 含 executors 全体执行人）；
+        负责人为 NULL 时仅任务 PL 或该环节对应角色可兜底；PL/管理员不自动获得他人环节的回退权
         约束：只能回退当前环节；步骤9 有专属的"需补测打回"规则（双审核，亦即末环），不走本通道
         （步骤5 已并入手动回退——通过与否以"提交到下一环节/返回上一环节"表达，审核意见记入处理说明；原"步骤10终态"已随该环节裁撤失效）
         原因必填，落两处（全流程可追溯）：
@@ -375,27 +548,20 @@ class TaskService:
         step = (await self.db.execute(stmt)).scalar_one_or_none()
         if not step or step.task_id != task_id:
             raise ValueError("环节不存在或不属于该任务")
+
+        # 权限：统一走 app.core.step_perms.can_operate_step（与 update_step、附件、用例同一口径）。
+        # 2026-11-26 前这里各写一份 `assigned_to == 本人 or assigned_to is None`，
+        # 等于"环节没指定负责人时任何人都能把流程退回去"。
+        #   · 环节7：主执行人 + executors 全体；其余环节：assigned_to 本人
+        #   · assigned_to 为 NULL：任务 PL 或具备该环节角色的人兜底（不是全员）
+        if not can_operate_step(step, task, user_id, user_roles):
+            raise PermissionError(deny_detail(step))
         if step.step != task.current_step:
             raise ValueError("只能回退当前环节")
         if step.step == 9:
             raise ValueError("步骤9请使用既有的『需补测』打回流程（数据审核双人复核）")
         if step.step <= 2:
             raise ValueError("当前环节没有可回退的上一步")
-
-        # 权限：仅当前环节负责人（PL 特权已取消——PL 名下环节与其他角色同权，按 assigned_to 认定）
-        is_cur_assignee = (step.assigned_to == user_id) or (step.assigned_to is None)
-        if step.step == 7:
-            executor_ids = set()
-            if task.executor_id:
-                executor_ids.add(task.executor_id)
-            if task.executors:
-                for e in task.executors:
-                    if isinstance(e, dict) and e.get('user_id'):
-                        executor_ids.add(int(e['user_id']))
-            if user_id in executor_ids:
-                is_cur_assignee = True
-        if not is_cur_assignee:
-            raise PermissionError("仅当前环节负责人可回退")
 
         prev_step_no = step.step - 1
         prev = (await self.db.execute(
@@ -404,15 +570,19 @@ class TaskService:
         if not prev:
             raise ValueError("上一环节不存在")
 
-        # 回退核心：上一环节重开为"进行中"（保留begin_date等历史痕迹，仅清完成时间）
-        # 当前环节保持原状态（通常pending），等上一环节重新完成后自然流转回来
-        prev.status = StepStatus.in_progress.value
-        prev.end_date = None
+        # 回退核心（2026-11-26 用户定夺）：当前环节与上一环节**都回到「尚未开始」(pending)。
+        #   · 当前环节(step)：本轮到此结束——收口本轮计时，状态重置为尚未开始；
+        #   · 上一环节(prev)：上一轮同样收口，状态重置为尚未开始，由负责人重新点「开始」才计时。
+        # 两边都**不**在回退瞬间自动开始新一轮：自动开始会让耗时把"等人来重做"的空档也算进去，
+        # 且上一环节直接变"进行中"、当前环节却还挂着一条没结束的计时，两边状态自相矛盾。
+        # 本轮结局统一记 rolled_back（轮次起止保留在 rounds 里，审计不丢）。
+        await self._reset_step(task_id, prev.step, reason="rolled_back")
+        await self._reset_step(task_id, step.step, reason="rolled_back")
         marker = f"[{datetime.now().strftime('%Y-%m-%d %H:%M')} 回退自步骤{step.step}] {reason.strip()}"
         prev.remark = f"{prev.remark} ｜ {marker}" if prev.remark else marker
 
-        # 进度/任务状态统一重算：_update_task_progress 会依据最早的"进行中"环节
-        # 自动把 current_step 修正为上一环节，并把任务status映射回对应阶段
+        # 进度/任务状态统一重算：两环都是 pending，_update_task_progress 会把 current_step
+        # 修正为上一环节（最早的未完成环节），并把任务 status 映射回对应阶段
         await self._update_task_progress(task_id)
 
         await self._log_action(
@@ -425,18 +595,17 @@ class TaskService:
         return prev
 
     async def change_step_assignee(self, task_id: int, step_id: int, new_uid: int, actor: User) -> TaskStep:
-        """PL改派非PL环节(3-8)的责任人（2026-09-22 需求）
+        """PL改派环节责任人（环节2-8；2026-09-22 需求，2026-11-26 纳入环节2）
 
         全链一致的保证方式 = 尊重"单一事实来源"：环节操作权/我的任务/展示文案
         全部由 task_steps.assigned_to 派生，改这一行 + 操作历史留痕即为全量同步；
-        同时**级联回写**对应的任务级角色字段（3/4/6/8→version_owner、7→executor_id、
-        5→owner，与建任务初始化 owner_map 一一对应）——详情页头部的
-        「版本负责人/测试执行人/PL」横幅读的是任务级字段，不回写会两层撕裂
+        同时**级联回写**对应的任务级角色字段（2→tse_id、3/4/6/8→version_owner、
+        7→executor_id、5→owner，与建任务初始化 owner_map 一一对应）——详情页头部的
+        「TSE/版本负责人/测试执行人/PL」横幅读的是任务级字段，不回写会两层撕裂
         （2026-09-22 用户反馈"改派后标题栏没变化"）。注意：任务字段→步骤方向的
-        既有的级联重铺约定仍在（任务编辑时重铺全部步骤，未被本操作的局部改派覆写前有效）。
-        开放范围即"非PL环节"：1/2为PL环节、9为双人共审(owner∪tse，见
-        list_tasks pending 特判与前端对应特判)兼末环，均不开放
-        （原"10为终态"随该环节裁撤自动退出本集合）。
+        级联重铺在 update_task 里做（只重铺该字段负责的环节，跳过已完成环节）。
+        开放范围：2-8；1（任务发起，创建即自动完成）与 9（双人共审 owner∪tse，
+        见 list_tasks pending 特判与前端对应特判）不开放。
         已完成(completed)环节不做改派；rejected(被打回待处理)保留可改派
         (打回即换人重来的场景)。审计动作 step_reassign 记新旧双名+级联说明。
         候选资格（2026-09-22 需求1/2）：目标责任人须持有该环节所属家族的项目角色
@@ -456,8 +625,10 @@ class TaskService:
         step = (await self.db.execute(stmt)).scalar_one_or_none()
         if not step or step.task_id != task_id:
             raise ValueError("环节不存在或不属于该任务")
-        if step.step in (1, 2, 9):
-            raise ValueError(f"环节{step.step}为PL/双人共审环节，不开放改派(仅3-8)")
+        # 2026-11-26：环节2 已开放（TSE 填错/离职时原先无任何入口可救，只能改库）；
+        # 1 为任务发起（创建即自动完成）、9 为 PL+TSE 双人共审，仍不开放。
+        if step.step in (1, 9):
+            raise ValueError("环节1（任务发起，创建即自动完成）与环节9（PL+TSE 双人共审）不开放改派")
         # 已完成环节不做改派（2026-09-22 用户约定：都完成了还改什么）；
         # rejected（被打回待处理）保留可改派——打回本就是"换人重来"的场景
         if step.status == StepStatus.completed.value:
@@ -546,17 +717,35 @@ class TaskService:
         await self.db.refresh(step)
         return step
 
-    async def _reset_step(self, task_id: int, step_no: int):
-        """将指定步骤退回待处理"""
+    async def _reset_step(self, task_id: int, step_no: int, reason: str = "rejected"):
+        """将指定步骤退回待处理
+
+        reason 只用于给「本轮记录」定结局（默认 rejected=被打回）。
+        本轮的时间区间必须在这里收口：_reset_step 之后 begin_date/end_date 会被清空，
+        不收口的话这一轮的起止就永久丢了，只剩一个空壳。
+        """
         stmt = select(TaskStep).where(
             TaskStep.task_id == task_id, TaskStep.step == step_no
         )
         result = await self.db.execute(stmt)
         target = result.scalar_one_or_none()
         if target:
+            if target.rounds or target.begin_date:
+                target.rounds = _close_round(
+                    target.rounds, _now(), reason, fallback_start=target.begin_date
+                )
             target.status = StepStatus.pending.value
             target.begin_date = None
             target.end_date = None
+            # 环节9（数据审核）的 PL/TSE 审核结论是"本轮裁决"，打回后必须清空。
+            # 否则下一轮重新提上来时，前端会用旧 ext_data 回填两个下拉框：
+            # 一方改成"通过"、另一方还留着上一轮的"需补测"，一点完成又被打回。
+            # 结论已由 update_step 在打回前归档进操作历史，不会丢审计。
+            if step_no == 9 and isinstance(target.ext_data, dict):
+                cleaned = dict(target.ext_data)
+                cleaned.pop("pl_review", None)
+                cleaned.pop("tse_review", None)
+                target.ext_data = cleaned
 
     async def _update_task_progress(self, task_id: int):
         """更新任务进度"""
@@ -590,12 +779,23 @@ class TaskService:
         else:
             task_status = self._get_status_by_step(current_step)
 
+        values = dict(progress=progress, current_step=current_step, status=task_status)
+        if completed == len(steps):
+            # 封卷：首次进入 done 时记任务实际完成时间。
+            # 已记过就不覆盖——避免后续任何一次进度重算把原始交付时间冲掉。
+            task_row = (await self.db.execute(
+                select(TestTask).where(TestTask.id == task_id)
+            )).scalar_one_or_none()
+            if task_row is not None and task_row.actual_end_date is None:
+                values["actual_end_date"] = _now()
+        else:
+            # 未全部完成（含末环被打回重开）：清空实际完成时间，
+            # 否则会出现"任务已回到测试中、实际完成时间却还留着"的自相矛盾。
+            # 上一轮的封卷时刻仍可从环节9的 rounds 与操作历史里查到。
+            values["actual_end_date"] = None
+
         # 更新任务
-        stmt = update(TestTask).where(TestTask.id == task_id).values(
-            progress=progress,
-            current_step=current_step,
-            status=task_status
-        )
+        stmt = update(TestTask).where(TestTask.id == task_id).values(**values)
         await self.db.execute(stmt)
     
     def _get_status_by_step(self, step: int) -> str:

@@ -11,6 +11,7 @@ from datetime import datetime
 
 from app.db.database import get_db
 from app.core.security import get_current_user, require_pp_manager
+from app.core.step_perms import assert_can_operate_any
 from app.models.models import User, CaseSuite, SuiteCase, TestCase, CaseModule, TaskCaseLink
 
 router = APIRouter(prefix="/api/suites", tags=["用例套件"])
@@ -224,7 +225,11 @@ async def link_suite_to_task(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """按套件批量关联用例到任务（测试设计环节用），已关联的自动跳过"""
+    """按套件批量关联用例到任务（测试设计环节用），已关联的自动跳过
+
+    权限（2026-11-25 补）：测试设计(2) 或 执行测试(7) 的负责人/执行人。
+    """
+    await assert_can_operate_any(db, task_id, (2, 7), user, "按套件关联用例到任务")
     await _get_suite_or_404(suite_id, db)
     rows = await db.execute(
         select(TestCase).join(SuiteCase, SuiteCase.case_id == TestCase.id)

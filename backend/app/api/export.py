@@ -17,7 +17,7 @@ from sqlalchemy import select
 from app.db.database import get_db
 from app.core.security import get_current_user
 from app.models.models import User, TestTask, TaskStep, Project, TaskCaseLink, CaseResult, TaskIssue
-from app.api.cases import get_enriched_linked_cases
+from app.api.cases import get_enriched_linked_cases, effective_case_status
 
 router = APIRouter(prefix="/api/tasks", tags=["导出"])
 
@@ -383,7 +383,7 @@ async def export_test_plan(
 
 
 # ---------------- 测试跟踪记录表（步骤7 执行测试的用例与结果汇总）----------------
-_RESULT_ZH = {'pass': '通过', 'fail': '失败', 'block': '阻塞', 'na': '不支持'}
+_RESULT_ZH = {'pass': '通过', 'fail': '失败', 'block': '阻塞', 'na': '不支持', 'partial': '部分执行'}
 _SEVERITY_ZH = {'fatal': '致命', 'serious': '严重', 'normal': '一般', 'minor': '轻微'}
 _ISSUE_STATUS_ZH = {'open': '未关闭', 'assigned': '已指派', 'fixed': '已修复',
                     'resolved': '已解决', 'closed': '已关闭', 'rejected': '已拒绝'}
@@ -421,9 +421,10 @@ def _build_tracking_row(case, issues_by_link, nm, depth=3):
     该常量定义在本函数之后，默认参数在 def 时求值会 NameError。
     """
     lr = case.get('latest_result') or {}
-    status = lr.get('status') or ''
     steps = _as_dict(case.get('steps')) or []
     step_results = _as_dict(lr.get('step_results')) or []
+    # 读取口径：历史「通过但步骤没测完」的旧结果按「部分执行」出表，不算通过
+    status = effective_case_status(lr.get('status') or '', step_results, steps if isinstance(steps, list) else []) or ''
 
     # 失败/阻塞原因：界面填在「失败/阻塞原因」框里，落库到 step_results[].actual
     reasons = []

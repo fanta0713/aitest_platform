@@ -87,3 +87,14 @@ async def require_pp_manager(user: User = Depends(get_current_user)) -> User:
     if not _PP_MANAGER_ROLES.intersection(_user_roles(user)):
         raise HTTPException(status_code=403, detail="仅 PL/TSE 或管理员可管理产品与项目")
     return user
+
+
+# 版本配套表管理权限：PL、TSE、版本负责人、管理员均可增删改查
+_VERSION_CONFIG_MANAGER_ROLES = {"admin", "pl", "tse", "version_owner"}
+
+
+async def require_version_config_manager(user: User = Depends(get_current_user)) -> User:
+    """版本配套表管理权限：PL / TSE / 版本负责人 / 管理员可增删改"""
+    if not _VERSION_CONFIG_MANAGER_ROLES.intersection(_user_roles(user)):
+        raise HTTPException(status_code=403, detail="仅 PL/TSE/版本负责人或管理员可管理版本配套表")
+    return user

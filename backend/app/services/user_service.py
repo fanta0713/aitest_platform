@@ -56,8 +56,15 @@ class UserService:
         await self.db.refresh(user)
         return user
 
-    async def list_users(self) -> List[User]:
-        stmt = select(User).where(User.is_active == True).order_by(User.id)  # noqa: E712
+    async def list_users(self, include_inactive: bool = False) -> List[User]:
+        """用户列表。include_inactive=False 只返回在职账号（默认）。
+
+        离职处理走「停用」而不是删除：停用后账号和历史记录都还在，
+        但默认不出现在负责人/执行人候选里；管理员需要查看时显式传 True。
+        """
+        stmt = select(User).order_by(User.id)
+        if not include_inactive:
+            stmt = stmt.where(User.is_active == True)  # noqa: E712
         result = await self.db.execute(stmt)
         return list(result.scalars().all())
 
